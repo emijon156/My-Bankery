@@ -35,12 +35,14 @@ struct LedgerView: View {
 
     private var currentTransactions: [NessieTransaction] {
         guard let l = ledger else { return [] }
+        let txns: [NessieTransaction]
         switch selectedAccount {
-        case .checking:   return l.checking.allTransactions
-        case .savings:    return l.savings.allTransactions
-        case .investment: return l.investment.allTransactions
-        case .loan:       return l.loan.allTransactions
+        case .checking:   txns = l.checking.allTransactions
+        case .savings:    txns = l.savings.allTransactions
+        case .investment: txns = l.investment.allTransactions
+        case .loan:       txns = l.loan.allTransactions
         }
+        return txns.sorted { ($0.transactionDate ?? "") > ($1.transactionDate ?? "") }
     }
 
     var body: some View {
@@ -145,11 +147,11 @@ struct LedgerView: View {
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Eclair")
-                                    .font(.custom("Cute-Dino", size: 42))
+                                    .font(.custom("Cute-Dino", size: 35))
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                 Text(displayedText)
-                                    .font(.custom("Cute-Dino", size: 32))
+                                    .font(.custom("Cute-Dino", size: 25))
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .topLeading)

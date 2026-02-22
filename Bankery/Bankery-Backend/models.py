@@ -177,3 +177,34 @@ class WeekResult(BaseModel):
     equipment: float
     game_outcome: str            # "ongoing" | "won" | "lost"
     alerts: list[Alert]
+
+
+class EventRequest(BaseModel):
+    """Sent by the frontend when the player makes a narrative-event choice."""
+    choice_index: int      # 0 = option A, 1 = option B
+    checking_id: str
+    savings_id: str
+    loan_id: str
+
+
+class EventResult(BaseModel):
+    """Returned by every /api/events/* endpoint."""
+    message: str
+    checking: float | None = None
+    savings:  float | None = None
+    loan:     float | None = None
+    alert_type: str = "info"   # "success" | "warning" | "info"
+
+
+class EclairReflectRequest(BaseModel):
+    """Sent by the frontend to ask Eclair to reflect on the finance actions taken this week."""
+    actions_summary: list[str]   # e.g. ["Transferred $500 from Checking to Savings", "Paid $200 toward loan"]
+    checking:        float
+    savings:         float
+    loan:            float
+    week:            int = 1
+
+
+class EclairReflectResponse(BaseModel):
+    """Eclair's Gemini-generated in-character reflection on the player's decision."""
+    reflection: str

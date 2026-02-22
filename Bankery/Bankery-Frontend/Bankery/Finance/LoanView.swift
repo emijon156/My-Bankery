@@ -6,18 +6,20 @@
 import SwiftUI
 
 private enum LoanMode: String, CaseIterable, Identifiable {
-    case pay    = "Pay Down"
+    case pay = "Pay Down"
     case borrow = "Borrow More"
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 }
 
 struct LoanView: View {
     @Environment(FinanceViewModel.self) private var vm
     @Environment(\.dismiss) private var dismiss
 
-    @State private var mode:       LoanMode = .pay
-    @State private var amountText: String   = ""
-    @State private var didSucceed: Bool     = false
+    @State private var mode: LoanMode = .pay
+    @State private var amountText: String = ""
+    @State private var didSucceed: Bool = false
 
     // Eclair panel
     @State private var displayedText: String = ""
@@ -30,18 +32,30 @@ struct LoanView: View {
     ]
     @State private var eclairIndex: Int = 0
 
-    private var amount: Double { Double(amountText) ?? 0 }
+    private var amount: Double {
+        Double(amountText) ?? 0
+    }
 
     private var validationError: String? {
-        if amount <= 0 { return "Enter an amount greater than $0." }
+        guard !amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil // Don't show error for empty field
+        }
+        if amount <= 0 { return "Enter a valid amount greater than $0." }
         if mode == .pay {
-            if amount > vm.checkingBalance { return "Not enough funds in Checking." }
-            if amount > vm.loanBalance     { return "Exceeds current loan balance." }
+            if amount > vm.checkingBalance { return "Not enough funds in Checking (\(formatted(vm.checkingBalance)) available)." }
+            if amount > vm.loanBalance { return "Amount exceeds current loan balance (\(formatted(vm.loanBalance)))." }
+        } else {
+            if amount > 50_000 { return "Loan amount cannot exceed $50,000." }
         }
         return nil
     }
 
-    private var canConfirm: Bool { validationError == nil && !vm.actionLoading }
+    private var canConfirm: Bool {
+        validationError == nil &&
+            !vm.actionLoading &&
+            amount > 0 &&
+            !amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -53,7 +67,6 @@ struct LoanView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-
                         // ── Back button + title ──
                         HStack {
                             Button { dismiss() } label: {
@@ -84,8 +97,8 @@ struct LoanView: View {
 
                         // ── Context text ──
                         Text(mode == .pay
-                             ? "Paying down the loan reduces your debt and saves on weekly interest charges."
-                             : "Taking more debt adds cash to Checking but increases your weekly interest payments.")
+                            ? "Paying down the loan reduces your debt and saves on weekly interest charges."
+                            : "Taking more debt adds cash to Checking but increases your weekly interest payments.")
                             .font(.custom("Cute-Dino", size: 16))
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.leading)
@@ -166,11 +179,11 @@ struct LoanView: View {
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Eclair")
-                                    .font(.custom("Cute-Dino", size: 42))
+                                    .font(.custom("Cute-Dino", size: 35))
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                 Text(displayedText)
-                                    .font(.custom("Cute-Dino", size: 32))
+                                    .font(.custom("Cute-Dino", size: 25))
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -206,6 +219,7 @@ struct LoanView: View {
     }
 
     // MARK: - Eclair helpers
+
     private func startTyping(_ text: String) {
         typingTask?.cancel()
         displayedText = ""
@@ -220,6 +234,7 @@ struct LoanView: View {
             isTyping = false
         }
     }
+
     private func handleEclairTap() {
         if isTyping {
             typingTask?.cancel()
@@ -235,11 +250,11 @@ struct LoanView: View {
 
     private var loanStatusCard: some View {
         HStack(spacing: 0) {
-            statCell(label: "Loan Balance", value: vm.loanBalance,     color: .red)
+            statCell(label: "Loan Balance", value: vm.loanBalance, color: .red)
             Divider()
-            statCell(label: "Checking",     value: vm.checkingBalance, color: .blue)
+            statCell(label: "Checking", value: vm.checkingBalance, color: .blue)
             Divider()
-            statCell(label: "Net Worth",    value: vm.netWorth,        color: vm.netWorth >= 0 ? .green : .red)
+            statCell(label: "Net Worth", value: vm.netWorth, color: vm.netWorth >= 0 ? .green : .red)
         }
         .background(Color(.secondarySystemBackground))
         .cornerRadius(14)
@@ -291,7 +306,12 @@ struct LoanView: View {
                 TextField("0.00", text: $amountText)
                     .font(.custom("Cute-Dino", size: 24))
                     .foregroundColor(.primary)
-                    .keyboardType(.decimalPad)
+                    .onChange(of: amountText) { _, newValue in
+                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                        if filtered != newValue {
+                            amountText = filtered
+                        }
+                    }
             }
             .padding()
             .background(Color(.secondarySystemBackground))
@@ -314,7 +334,7 @@ struct LoanView: View {
 
     private func formatted(_ amount: Double) -> String {
         let f = NumberFormatter()
-        f.numberStyle  = .currency
+        f.numberStyle = .currency
         f.currencyCode = "USD"
         return f.string(from: NSNumber(value: amount)) ?? "$\(amount)"
     }

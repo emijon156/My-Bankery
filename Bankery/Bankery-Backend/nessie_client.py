@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 API_KEY: str = os.getenv("NESSIE_API_KEY", "")
-BASE_URL: str = "http://api.reimaginebanking.com"
+BASE_URL: str = "http://api.nessieisreal.com"
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ def delete_account(account_id: str) -> dict:
 def create_merchant(name: str, category: str) -> dict:
     payload = {
         "name": name,
-        "category": [category],
+        "category": category,
         "address": {
             "street_number": "1",
             "street_name": "Franklin St",
@@ -261,7 +261,7 @@ def create_purchase(
         "purchase_date": purchase_date or str(date.today()),
         "amount": round(amount, 2),
         "description": description,
-        "status": "pending",
+        "status": "completed",
     }
     data = _post(f"/accounts/{account_id}/purchases", payload)
     return data.get("objectCreated", data)
@@ -285,7 +285,6 @@ def create_bill(
         "status": status,
         "payee": nickname,
         "nickname": nickname,
-        "creation_date": str(date.today()),
         "payment_date": str(date.today()),
         "recurring_date": 1,
         "payment_amount": round(amount, 2),

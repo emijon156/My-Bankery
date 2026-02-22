@@ -44,8 +44,30 @@ Report
 
 from __future__ import annotations
 
+import os
+from dotenv import load_dotenv
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from google import genai
+from google.genai import types as genai_types
+import yfinance as yf
+
+load_dotenv()
+_GENAI_CLIENT = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY", ""),
+    http_options={"api_version": "v1beta"},
+)
+
+_ECLAIR_SYSTEM = (
+    "You are Eclair, an adorably nervous panda who owns the Bankery, a beloved pastry shop. "
+    "You are learning about personal finance and speak in a warm, playful voice full of baking "
+    "metaphors and gentle puns. You are honest about money — not preachy, just real — and always "
+    "keep your response to exactly 2-3 short sentences. Never break character. "
+    "Never use bullet points, lists, or formal language."
+)
+
+
 
 import nessie_client
 import game_engine
@@ -58,6 +80,10 @@ from models import (
     TransferRequest,
     BuyInventoryRequest,
     UpgradeEquipmentRequest,
+    EventRequest,
+    EventResult,
+    EclairReflectRequest,
+    EclairReflectResponse,
 )
 
 app = FastAPI(
@@ -163,7 +189,66 @@ def upgrade_equipment(req: UpgradeEquipmentRequest):
 
 
 # ---------------------------------------------------------------------------
-# Customer & Account Data
+# Narrative Event Choices
+# ---------------------------------------------------------------------------
+
+@app.post("/api/events/oven_repair", response_model=EventResult,
+          summary="Issue 1: Oven breakdown — player chooses credit or bear-with-it")
+def event_oven_repair(req: EventRequest):
+    """
+    choice_index 0 → charge $1,500 repair to credit card (loan up).
+    choice_index 1 → bear with reduced capacity ($300 lost revenue).
+    """
+    result = game_engine.handle_oven_repair(
+        req.checking_id, req.loan_id, req.choice_index
+    )
+    return EventResult(
+        message=result["message"],
+        checking=result.get("checking"),
+        savings=result.get("savings"),
+        loan=result.get("loan"),
+        alert_type=result.get("alert_type", "info"),
+    )
+
+
+@app.post("/api/events/windfall", response_model=EventResult,
+          summary="Issue 2: Viral-video windfall — HYSA vs impulse purchase")
+def event_windfall(req: EventRequest):
+    """
+    choice_index 0 → deposit $2,000 windfall to High-Yield Savings.
+    choice_index 1 → keep in checking, spend $500 on rose-gold whisk.
+    """
+    result = game_engine.handle_windfall(
+        req.checking_id, req.savings_id, req.choice_index
+    )
+    return EventResult(
+        message=result["message"],
+        checking=result.get("checking"),
+        savings=result.get("savings"),
+        loan=result.get("loan"),
+        alert_type=result.get("alert_type", "info"),
+    )
+
+
+@app.post("/api/events/permit_fine", response_model=EventResult,
+          summary="Issue 3: Health-inspector permit fine — pay now or appeal")
+def event_permit_fine(req: EventRequest):
+    """
+    choice_index 0 → pay $200 fine immediately.
+    choice_index 1 → appeal: two weeks of closure costs $600 in lost revenue.
+    """
+    result = game_engine.handle_permit_fine(
+        req.checking_id, req.choice_index
+    )
+    return EventResult(
+        message=result["message"],
+        checking=result.get("checking"),
+        savings=result.get("savings"),
+        loan=result.get("loan"),
+        alert_type=result.get("alert_type", "info"),
+    )
+
+
 # ---------------------------------------------------------------------------
 
 @app.get("/api/accounts/{account_id}/deposits", summary="Deposit history for an account")
@@ -201,6 +286,89 @@ def full_ledger(
         loan_id=loan_id,
     )
     return game_engine.get_full_ledger(accounts)
+
+
+# ---------------------------------------------------------------------------
+# Eclair Gemini Reflection
+# ---------------------------------------------------------------------------
+
+@app.post("/api/eclair/reflect", response_model=EclairReflectResponse,
+          summary="Generate an in-character Eclair reflection on the player's finance-screen actions")
+async def eclair_reflect(req: EclairReflectRequest):
+    """
+    Builds a prompt from the list of finance actions the player took this week,
+    sends it to Gemini 1.5 Flash (async), and returns Eclair's 2-3 sentence
+    in-character response. Falls back to a canned line on any API error.
+    """
+    if req.actions_summary:
+        actions_text = "\n".join(f"• {a}" for a in req.actions_summary)
+    else:
+        actions_text = "• I didn't make any changes this week."
+
+    prompt = (
+        f"I'm Eclair, a panda who owns a bakery. This week (Week {req.week}) my advisor took these actions: {', '.join(req.actions_summary)}. "
+        f"The current balances are: checking ${req.checking:,.0f}, savings ${req.savings:,.0f}, loan ${req.loan:,.0f}. "
+        "Give me 1-2 sentences of actual, practical financial advice on whether these were good moves or what I should focus on next. "
+        "Be blunt and mean brutal do not be nice."
+    )
+    try:
+        response = await _GENAI_CLIENT.aio.models.generate_content(
+            model="models/gemini-2.5-flash-lite",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=_ECLAIR_SYSTEM,
+                max_output_tokens=2048,
+                temperature=0.7,
+            ),
+        )
+        candidate = response.candidates[0]
+        finish_reason = candidate.finish_reason
+        full_text = response.text.strip()
+        print(f"[Eclair] OK (finish={finish_reason}): '{full_text[:60]}...'")
+        return EclairReflectResponse(reflection=full_text)
+    except Exception as e:
+        print(f"[Eclair] Gemini API error: {e}")
+        return EclairReflectResponse(
+            reflection=(
+                "Oof, my brain got a bit over-proofed there! "
+                "But I trust every good baker learns from their batter mistakes, "
+                "so let's keep our chins — and our profit margin — up!"
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Investments — live market data via yfinance
+# ---------------------------------------------------------------------------
+
+_TOP_TICKERS = ["SPY", "AAPL", "MSFT", "NVDA", "AMZN"]
+
+@app.get("/api/investments/top", summary="Top 5 tickers with live price + daily % change")
+def top_investments():
+    """
+    Returns current price and daily % change for the five tracked tickers.
+    Uses yfinance fast_info for low-latency lookups.
+    """
+    results = []
+    for symbol in _TOP_TICKERS:
+        try:
+            fi = yf.Ticker(symbol).fast_info
+            price = round(float(fi.last_price), 2)
+            prev  = float(fi.previous_close or fi.regular_market_previous_close or price)
+            change_pct = round((price - prev) / prev * 100, 2) if prev else 0.0
+            results.append({
+                "symbol":           symbol,
+                "price":            price,
+                "daily_change_pct": change_pct,
+            })
+        except Exception as exc:
+            results.append({
+                "symbol":           symbol,
+                "price":            0.0,
+                "daily_change_pct": 0.0,
+                "error":            str(exc),
+            })
+    return {"tickers": results}
 
 
 # ---------------------------------------------------------------------------

@@ -14,13 +14,6 @@ struct InitResponse: Decodable {
     let merchants: MerchantIDs
     let startingBalances: StartingBalances
     let message: String
-
-    enum CodingKeys: String, CodingKey {
-        case accounts
-        case merchants
-        case startingBalances = "starting_balances"
-        case message
-    }
 }
 
 struct StartingBalances: Decodable {
@@ -38,25 +31,12 @@ struct AccountIDs: Codable {
     let savingsId: String
     let investmentId: String
     let loanId: String
-
-    enum CodingKeys: String, CodingKey {
-        case checkingId   = "checking_id"
-        case savingsId    = "savings_id"
-        case investmentId = "investment_id"
-        case loanId       = "loan_id"
-    }
 }
 
 struct MerchantIDs: Codable {
     let supplyMerchantId: String
     let equipmentMerchantId: String
     let utilityMerchantId: String
-
-    enum CodingKeys: String, CodingKey {
-        case supplyMerchantId    = "supply_merchant_id"
-        case equipmentMerchantId = "equipment_merchant_id"
-        case utilityMerchantId   = "utility_merchant_id"
-    }
 }
 
 // MARK: - Next Week Request  (POST /api/game/next-week)
@@ -81,13 +61,6 @@ struct WeekResult: Decodable {
     let equipment: Double
     let gameOutcome: String         // "ongoing" | "won" | "lost"
     let alerts: [GameAlert]
-
-    enum CodingKeys: String, CodingKey {
-        case week, revenue, balances, inventory, equipment, alerts
-        case fixedExpenses = "fixed_expenses"
-        case netWorth      = "net_worth"
-        case gameOutcome   = "game_outcome"
-    }
 }
 
 struct WeekBalances: Decodable {
@@ -105,7 +78,7 @@ struct GameAlert: Decodable, Identifiable {
     let message: String
 
     enum CodingKeys: String, CodingKey {
-        case type, message
+        case type, message        // id is excluded so Decodable doesn't expect it in JSON
     }
 }
 
@@ -136,34 +109,46 @@ enum AccountType: String, CaseIterable, Identifiable {
 // MARK: - Action Result (response from POST /api/actions/*)
 
 struct ActionResult: Decodable {
-    let message:     String
+    let message:     String?
+    let error:       String?
     let checking:    Double?
     let savings:     Double?
     let investment:  Double?
     let loan:        Double?
     let fromBalance: Double?
     let toBalance:   Double?
-
-    enum CodingKeys: String, CodingKey {
-        case message, checking, savings, investment, loan
-        case fromBalance = "from_balance"
-        case toBalance   = "to_balance"
-    }
 }
 
 // MARK: - Ledger  (GET /api/ledger)
 
 struct NessieTransaction: Decodable, Identifiable {
     let id:              String
-    let amount:          Double
-    let description:     String?
     let status:          String?
-    let transactionDate: String?
+
+    // Regular transactions use "amount"; bills use "payment_amount"
+    private let _amount:        Double?
+    private let _paymentAmount: Double?
+    var amount: Double { _amount ?? _paymentAmount ?? 0 }
+
+    // Regular transactions use "description"; bills use "payee"
+    private let _description: String?
+    private let _payee:       String?
+    var description: String? { _description ?? _payee }
+
+    // Regular transactions use "transaction_date"; bills use "payment_date"
+    private let _transactionDate: String?
+    private let _paymentDate:     String?
+    var transactionDate: String? { _transactionDate ?? _paymentDate }
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
-        case amount, description, status
-        case transactionDate = "transaction_date"
+        case status
+        case _amount          = "amount"
+        case _paymentAmount   = "payment_amount"
+        case _description     = "description"
+        case _payee           = "payee"
+        case _transactionDate = "transaction_date"
+        case _paymentDate     = "payment_date"
     }
 }
 
@@ -189,5 +174,49 @@ struct LedgerData: Decodable {
     let savings:    AccountLedger
     let investment: AccountLedger
     let loan:       AccountLedger
+}
+
+// MARK: - Eclair Gemini Reflection  (POST /api/eclair/reflect)
+
+struct EclairReflectRequest: Encodable {
+    let actionsSummary: [String]
+    let checking:       Double
+    let savings:        Double
+    let loan:           Double
+    let week:           Int
+}
+
+struct EclairReflectResponse: Decodable {
+    let reflection: String
+}
+
+// MARK: - Investments  (GET /api/investments/top)
+
+struct TopTicker: Decodable, Identifiable {
+    let symbol:         String
+    let price:          Double
+    let dailyChangePct: Double
+    var id: String { symbol }
+}
+
+struct TopInvestmentsResponse: Decodable {
+    let tickers: [TopTicker]
+}
+
+// MARK: - Event Request / Response  (POST /api/events/*)
+
+struct EventRequest: Encodable {
+    let choiceIndex: Int
+    let checkingId:  String
+    let savingsId:   String
+    let loanId:      String
+}
+
+struct EventResult: Decodable {
+    let message:   String
+    let checking:  Double?
+    let savings:   Double?
+    let loan:      Double?
+    let alertType: String?    // "success" | "warning" | "info"
 }
 

@@ -36,13 +36,21 @@ struct TransferView: View {
     }
 
     private var validationError: String? {
+        guard !amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil  // Don't show error for empty field
+        }
         if fromAccount == toAccount { return "From and To accounts must be different." }
-        if amount <= 0              { return "Enter an amount greater than $0." }
-        if amount > sourceBalance   { return "Not enough funds in \(fromAccount.rawValue)." }
+        if amount <= 0              { return "Enter a valid amount greater than $0." }
+        if amount > sourceBalance   { return "Not enough funds in \(fromAccount.rawValue) (\(formatted(sourceBalance)) available)." }
         return nil
     }
 
-    private var canTransfer: Bool { validationError == nil && !vm.actionLoading }
+    private var canTransfer: Bool { 
+        validationError == nil && 
+        !vm.actionLoading && 
+        amount > 0 && 
+        !amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty 
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -112,8 +120,8 @@ struct TransferView: View {
                                 if vm.actionError == nil {
                                     didSucceed = true
                                     amountText = ""
-                                    try? await Task.sleep(nanoseconds: 800_000_000)
-                                    dismiss()
+                                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                    didSucceed = false
                                 }
                             }
                         } label: {
@@ -160,11 +168,11 @@ struct TransferView: View {
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Eclair")
-                                    .font(.custom("Cute-Dino", size: 42))
+                                    .font(.custom("Cute-Dino", size: 35))
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                 Text(displayedText)
-                                    .font(.custom("Cute-Dino", size: 32))
+                                    .font(.custom("Cute-Dino", size: 25))
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .topLeading)

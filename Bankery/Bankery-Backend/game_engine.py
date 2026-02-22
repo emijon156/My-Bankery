@@ -20,9 +20,33 @@ from __future__ import annotations
 
 import random
 from datetime import date
+from typing import Dict
 
 import nessie_client
 from models import AccountIds, MerchantIds, Alert, ExpenseState
+
+# ---------------------------------------------------------------------------
+# In-memory balance cache
+# Nessie balances are stale immediately after posting a transaction, so we
+# track the authoritative running balance ourselves and only fall back to
+# Nessie on a cold-start (first access for an account_id).
+# ---------------------------------------------------------------------------
+_balance_cache: Dict[str, float] = {}
+
+def _get_balance(account_id: str) -> float:
+    """Return cached balance, or fetch from Nessie and seed the cache."""
+    if account_id not in _balance_cache:
+        _balance_cache[account_id] = nessie_client.get_account_balance(account_id)
+    return _balance_cache[account_id]
+
+def _set_balance(account_id: str, balance: float) -> None:
+    """Update the cache after an action changes a balance."""
+    _balance_cache[account_id] = round(balance, 2)
+
+def seed_balances(balances: Dict[str, float]) -> None:
+    """Called after game init to pre-seed the cache with known starting values."""
+    for account_id, bal in balances.items():
+        _balance_cache[account_id] = float(bal)
 
 # ---------------------------------------------------------------------------
 # Financial constants
@@ -90,6 +114,14 @@ def setup_game() -> dict:
     nessie_client.create_bill(account_ids["checking_id"], DEFAULT_EXPENSES.rent,    "Monthly Bakery Rent")
     nessie_client.create_bill(account_ids["checking_id"], DEFAULT_EXPENSES.wage,    "Monthly Employee Wages")
     nessie_client.create_bill(account_ids["checking_id"], DEFAULT_EXPENSES.utility, "Monthly Utilities")
+
+    # Seed the in-memory balance cache so subsequent action calls use correct values
+    seed_balances({
+        account_ids["checking_id"]:   3_000.0,
+        account_ids["savings_id"]:    6_000.0,
+        account_ids["investment_id"]: 1_000.0,
+        account_ids["loan_id"]:      15_000.0,
+    })
 
     return {
         "customer_id": customer_id,
@@ -189,12 +221,18 @@ def add_loan(checking_id: str, loan_id: str, amount: float) -> dict:
     Take out a new loan.
     Nessie: deposit to checking (cash in hand) + deposit to loan (debt increases).
     """
-    today = str(date.today())
-    nessie_client.create_deposit(checking_id, amount, "Loan Disbursement",      today)
+    today        = str(date.today())
+    checking_bal = _get_balance(checking_id)
+    loan_bal     = _get_balance(loan_id)
+    nessie_client.create_deposit(checking_id, amount, "Loan Disbursement",        today)
     nessie_client.create_deposit(loan_id,     amount, "New Loan Principal Added", today)
+    new_checking = round(checking_bal + amount, 2)
+    new_loan     = round(loan_bal     + amount, 2)
+    _set_balance(checking_id, new_checking)
+    _set_balance(loan_id,     new_loan)
     return {
-        "checking": nessie_client.get_account_balance(checking_id),
-        "loan":     nessie_client.get_account_balance(loan_id),
+        "checking": new_checking,
+        "loan":     new_loan,
         "message":  f"Took out a loan of ${amount:,.2f}.",
     }
 
@@ -205,8 +243,8 @@ def pay_loan(checking_id: str, loan_id: str, amount: float) -> dict:
     Nessie: withdrawal from checking + withdrawal from loan account (debt decreases).
     """
     today        = str(date.today())
-    checking_bal = nessie_client.get_account_balance(checking_id)
-    loan_bal     = nessie_client.get_account_balance(loan_id)
+    checking_bal = _get_balance(checking_id)
+    loan_bal     = _get_balance(loan_id)
 
     if checking_bal < amount:
         return {
@@ -219,10 +257,13 @@ def pay_loan(checking_id: str, loan_id: str, amount: float) -> dict:
     payment = min(amount, loan_bal)
     nessie_client.create_withdrawal(checking_id, payment, "Loan Payment",          today)
     nessie_client.create_withdrawal(loan_id,     payment, "Loan Payment Received", today)
-
+    new_checking = round(checking_bal - payment, 2)
+    new_loan     = round(loan_bal     - payment, 2)
+    _set_balance(checking_id, new_checking)
+    _set_balance(loan_id,     new_loan)
     return {
-        "checking": nessie_client.get_account_balance(checking_id),
-        "loan":     nessie_client.get_account_balance(loan_id),
+        "checking": new_checking,
+        "loan":     new_loan,
         "message":  f"Paid ${payment:,.2f} toward your loan.",
     }
 
@@ -238,7 +279,7 @@ def transfer_cash(
     Uses the Nessie Transfers API (distinct from deposits/withdrawals).
     """
     today    = str(date.today())
-    src_bal  = nessie_client.get_account_balance(from_account_id)
+    src_bal  = _get_balance(from_account_id)
 
     if src_bal < amount:
         return {
@@ -248,10 +289,15 @@ def transfer_cash(
             )
         }
 
+    dst_bal = _get_balance(to_account_id)
     nessie_client.create_transfer(from_account_id, to_account_id, amount, description, today)
+    new_src = round(src_bal - amount, 2)
+    new_dst = round(dst_bal + amount, 2)
+    _set_balance(from_account_id, new_src)
+    _set_balance(to_account_id,   new_dst)
     return {
-        "from_balance": nessie_client.get_account_balance(from_account_id),
-        "to_balance":   nessie_client.get_account_balance(to_account_id),
+        "from_balance": new_src,
+        "to_balance":   new_dst,
         "message":      f"Transferred ${amount:,.2f} successfully.",
     }
 
@@ -259,7 +305,7 @@ def transfer_cash(
 def buy_inventory(checking_id: str, supply_merchant_id: str, amount: float) -> dict:
     """Purchase bakery supplies using the Purchases API (supply merchant)."""
     today        = str(date.today())
-    checking_bal = nessie_client.get_account_balance(checking_id)
+    checking_bal = _get_balance(checking_id)
 
     if checking_bal < amount:
         return {"error": f"Not enough funds (${checking_bal:,.2f}) to buy ${amount:,.2f} in inventory."}
@@ -267,8 +313,10 @@ def buy_inventory(checking_id: str, supply_merchant_id: str, amount: float) -> d
     nessie_client.create_purchase(
         checking_id, supply_merchant_id, amount, "Inventory Purchase", today
     )
+    new_checking = round(checking_bal - amount, 2)
+    _set_balance(checking_id, new_checking)
     return {
-        "checking": nessie_client.get_account_balance(checking_id),
+        "checking": new_checking,
         "message":  f"Purchased ${amount:,.2f} in bakery supplies.",
     }
 
@@ -276,7 +324,7 @@ def buy_inventory(checking_id: str, supply_merchant_id: str, amount: float) -> d
 def upgrade_equipment(checking_id: str, equipment_merchant_id: str, amount: float) -> dict:
     """Buy an equipment upgrade using the Purchases API (equipment merchant)."""
     today        = str(date.today())
-    checking_bal = nessie_client.get_account_balance(checking_id)
+    checking_bal = _get_balance(checking_id)
 
     if checking_bal < amount:
         return {"error": f"Not enough funds (${checking_bal:,.2f}) for equipment upgrade of ${amount:,.2f}."}
@@ -284,14 +332,144 @@ def upgrade_equipment(checking_id: str, equipment_merchant_id: str, amount: floa
     nessie_client.create_purchase(
         checking_id, equipment_merchant_id, amount, "Equipment Upgrade", today
     )
+    new_checking = round(checking_bal - amount, 2)
+    _set_balance(checking_id, new_checking)
     return {
-        "checking": nessie_client.get_account_balance(checking_id),
+        "checking": new_checking,
         "message":  f"Purchased equipment upgrade for ${amount:,.2f}.",
     }
 
 
 # ---------------------------------------------------------------------------
-# Transaction history & reporting
+# Narrative event handlers  (called when player makes a story choice)
+# ---------------------------------------------------------------------------
+
+OVEN_REPAIR_COST:    float = 1_500.0
+OVEN_CAPACITY_LOSS:  float = 300.0    # weekly revenue shortfall from using fewer ovens
+WINDFALL_AMOUNT:     float = 2_000.0  # viral-video revenue boost
+ROSE_GOLD_WHISK:     float = 500.0    # impulse-purchase price
+PERMIT_FINE:         float = 200.0
+APPEAL_INCOME_LOSS:  float = 600.0    # two weeks of ~$300/week lost while closed
+
+
+def handle_oven_repair(checking_id: str, loan_id: str, choice_index: int) -> dict:
+    """
+    Issue 1: Oven breakdown.
+    choice_index 0 — pay $1,500 on credit (loan increases).
+    choice_index 1 — bear with remaining ovens ($300 lost revenue this week).
+    """
+    today = str(date.today())
+    if choice_index == 0:
+        # Put repair on credit card → loan balance grows
+        loan_bal = _get_balance(loan_id)
+        nessie_client.create_deposit(loan_id, OVEN_REPAIR_COST,
+                                     "Oven Repair Charged to Credit", today)
+        new_loan = round(loan_bal + OVEN_REPAIR_COST, 2)
+        _set_balance(loan_id, new_loan)
+        return {
+            "checking":  _get_balance(checking_id),
+            "loan":      new_loan,
+            "message":   f"Oven repaired on credit. Loan increased by ${OVEN_REPAIR_COST:,.2f}.",
+            "alert_type": "warning",
+        }
+    else:
+        # Bear with reduced capacity → deduct lost revenue from checking
+        checking_bal = _get_balance(checking_id)
+        loss = min(OVEN_CAPACITY_LOSS, checking_bal)  # never overdraw
+        if loss > 0:
+            nessie_client.create_withdrawal(checking_id, loss,
+                                            "Reduced Capacity Revenue Loss", today)
+        new_checking = round(checking_bal - loss, 2)
+        _set_balance(checking_id, new_checking)
+        return {
+            "checking":  new_checking,
+            "loan":      _get_balance(loan_id),
+            "message":   f"Managed with two ovens. Revenue reduced by ${loss:,.2f} this week.",
+            "alert_type": "info",
+        }
+
+
+def handle_windfall(checking_id: str, savings_id: str, choice_index: int) -> dict:
+    """
+    Issue 2: Viral-video windfall.
+    First deposits $2,000 to checking in both branches.
+    choice_index 0 — move windfall to HYSA (savings).
+    choice_index 1 — splurge on rose-gold whisk ($500 impulse buy).
+    """
+    today = str(date.today())
+    # Common: deposit the viral earnings
+    checking_bal = _get_balance(checking_id)
+    nessie_client.create_deposit(checking_id, WINDFALL_AMOUNT,
+                                 "Viral Video Revenue Boost", today)
+    checking_bal = round(checking_bal + WINDFALL_AMOUNT, 2)
+    _set_balance(checking_id, checking_bal)
+
+    if choice_index == 0:
+        # Transfer windfall to savings
+        savings_bal = _get_balance(savings_id)
+        nessie_client.create_transfer(checking_id, savings_id, WINDFALL_AMOUNT,
+                                      "Windfall to HYSA", today)
+        new_checking = round(checking_bal - WINDFALL_AMOUNT, 2)
+        new_savings  = round(savings_bal  + WINDFALL_AMOUNT, 2)
+        _set_balance(checking_id, new_checking)
+        _set_balance(savings_id,  new_savings)
+        return {
+            "checking": new_checking,
+            "savings":  new_savings,
+            "message":  f"${WINDFALL_AMOUNT:,.2f} windfall deposited to your High-Yield Savings!",
+            "alert_type": "success",
+        }
+    else:
+        # Impulse purchase: rose-gold whisk
+        cost = min(ROSE_GOLD_WHISK, checking_bal)
+        if cost > 0:
+            nessie_client.create_withdrawal(checking_id, cost,
+                                            "Rose-Gold Whisk Impulse Purchase", today)
+        new_checking = round(checking_bal - cost, 2)
+        _set_balance(checking_id, new_checking)
+        return {
+            "checking": new_checking,
+            "savings":  _get_balance(savings_id),
+            "message":  f"${WINDFALL_AMOUNT:,.2f} windfall received! Spent ${cost:,.2f} on a rose-gold whisk.",
+            "alert_type": "info",
+        }
+
+
+def handle_permit_fine(checking_id: str, choice_index: int) -> dict:
+    """
+    Issue 3: Health inspector permit fine ($200).
+    choice_index 0 — pay the $200 fine immediately.
+    choice_index 1 — appeal: doors closed 2 weeks → $600 of lost income.
+    """
+    today = str(date.today())
+    if choice_index == 0:
+        checking_bal = _get_balance(checking_id)
+        payment = min(PERMIT_FINE, checking_bal)
+        if payment > 0:
+            nessie_client.create_withdrawal(checking_id, payment, "Permit Fine Payment", today)
+        new_checking = round(checking_bal - payment, 2)
+        _set_balance(checking_id, new_checking)
+        return {
+            "checking":  new_checking,
+            "message":   f"Permit fine of ${payment:,.2f} paid. Bakery stays open!",
+            "alert_type": "warning",
+        }
+    else:
+        # Appeal: two-week closure means lost revenue
+        checking_bal = _get_balance(checking_id)
+        loss = min(APPEAL_INCOME_LOSS, checking_bal)
+        if loss > 0:
+            nessie_client.create_withdrawal(checking_id, loss,
+                                            "Appeal Closure Revenue Loss", today)
+        new_checking = round(checking_bal - loss, 2)
+        _set_balance(checking_id, new_checking)
+        return {
+            "checking":  new_checking,
+            "message":   f"Appeal filed. Closed for 2 weeks — lost ${loss:,.2f} in revenue.",
+            "alert_type": "warning",
+        }
+
+
 # ---------------------------------------------------------------------------
 
 def get_full_ledger(accounts: AccountIds) -> dict:
@@ -394,36 +572,39 @@ def _apply_interest(accounts: AccountIds, today: str) -> list[dict]:
     alerts: list[dict] = []
 
     # Savings APY
-    savings_bal = nessie_client.get_account_balance(accounts.savings_id)
+    savings_bal = _get_balance(accounts.savings_id)
     savings_int = round(savings_bal * SAVINGS_WEEKLY_RATE, 2)
     if savings_int > 0:
         nessie_client.create_deposit(
             accounts.savings_id, savings_int, "Safety Vault Weekly APY", today
         )
+        _set_balance(accounts.savings_id, round(savings_bal + savings_int, 2))
         alerts.append({
             "type": "success",
             "message": f"Your Safety Vault earned ${savings_int:.2f} in interest.",
         })
 
     # Investment return
-    invest_bal = nessie_client.get_account_balance(accounts.investment_id)
+    invest_bal = _get_balance(accounts.investment_id)
     invest_int = round(invest_bal * INVESTMENT_WEEKLY_RATE, 2)
     if invest_int > 0:
         nessie_client.create_deposit(
             accounts.investment_id, invest_int, "Investment Fund Weekly Return", today
         )
+        _set_balance(accounts.investment_id, round(invest_bal + invest_int, 2))
         alerts.append({
             "type": "success",
             "message": f"Your Investment Fund earned ${invest_int:.2f} this week.",
         })
 
     # Loan interest (debt grows)
-    loan_bal  = nessie_client.get_account_balance(accounts.loan_id)
+    loan_bal  = _get_balance(accounts.loan_id)
     loan_int  = round(loan_bal * LOAN_WEEKLY_RATE, 2)
     if loan_int > 0:
         nessie_client.create_deposit(
             accounts.loan_id, loan_int, "Weekly Loan Interest Charge", today
         )
+        _set_balance(accounts.loan_id, round(loan_bal + loan_int, 2))
         alerts.append({
             "type": "warning",
             "message": f"Your loan accrued ${loan_int:.2f} in interest this week.",
@@ -434,8 +615,8 @@ def _apply_interest(accounts: AccountIds, today: str) -> list[dict]:
 
 def _get_balances(accounts: AccountIds) -> dict[str, float]:
     return {
-        "checking":   nessie_client.get_account_balance(accounts.checking_id),
-        "savings":    nessie_client.get_account_balance(accounts.savings_id),
-        "investment": nessie_client.get_account_balance(accounts.investment_id),
-        "loan":       nessie_client.get_account_balance(accounts.loan_id),
+        "checking":   _get_balance(accounts.checking_id),
+        "savings":    _get_balance(accounts.savings_id),
+        "investment": _get_balance(accounts.investment_id),
+        "loan":       _get_balance(accounts.loan_id),
     }

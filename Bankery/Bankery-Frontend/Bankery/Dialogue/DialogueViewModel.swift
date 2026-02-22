@@ -6,56 +6,232 @@
 import Foundation
 import Observation
 
+// MARK: - Narrative Stage Constants
+// Stage 0: Scene 1 – intro (DialogueView)  → FinanceView stage 0 (balance sheet tutorial)
+// Stage 1: Issue 1 – Oven (DialogueView)   → FinanceView stage 1
+// Stage 2: Issue 2 – Viral (DialogueView)  → FinanceView stage 2
+// Stage 3: Issue 3 – Inspector (DialogueView) → FinanceView stage 3
+// Stage 4: Scene 2 – Investing (DialogueView) → FinanceView stage 4
+// Stage 5: End Scene (DialogueView, terminal – no FinanceView)
+
 @Observable
 class DialogueViewModel {
 
-    // MARK: - Intro dialogue lines (before FinanceView)
+    // MARK: - Intro / inter-scene dialogue (shown in DialogueView)
     private let allLines: [DialogueLine] = [
 
-        // Stage 0 – intro
-        DialogueLine(speaker: "Eclair", text: "Welcome! I'm Eclair, owner of Bankery.",                         poseImageName: "stand_speak_armsout", stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Things haven't been going so well lately…",                      poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Our checking account is running low, and we still have loans.",   poseImageName: "stand_worried",        stage: 0),
-        DialogueLine(speaker: "Eclair", text: "I need someone smart to help manage our finances.",               poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Think you're up for it? Let's get started!",                      poseImageName: "stand_speak_armsout", stage: 0),
+        // ── Stage 0 · SCENE 1: Outside the Bankery ──────────────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Oh! Hi there! You must be the Financial Assistant I hired! Welcome to the Bankery! I'm Eclair.",
+            poseImageName: "stand_speak_armsout", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "I'm great at making the 'dough,' but I'm... well, a little bit lost when it comes to managing it.",
+            poseImageName: "stand_speak", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Every time I see a spreadsheet, my brain feels like over-proofed bread!",
+            poseImageName: "stand_worried", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "I need your savvy eyes to help me make the big calls so we can keep this shop afloat.",
+            poseImageName: "stand_speak", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Ready to help a panda out?",
+            poseImageName: "stand_speak_armsout", stage: 0),
 
-        // Stage 1 – after day 1
-        DialogueLine(speaker: "Eclair", text: "Nice work! We made it through the first day.",                    poseImageName: "stand_speak_armsout", stage: 1),
-        DialogueLine(speaker: "Eclair", text: "Keep an eye on the loan — those interest payments add up!",       poseImageName: "stand_worried",        stage: 1),
+        // ── Stage 1 · ISSUE 1: Oven breaks down ($1,500) ────────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Eek! My oven let out a tiny 'poof' and now it's taking a nap. I'm in a real sticky situation — and not the good, glaze-covered kind of sticky. What should I do?!",
+            poseImageName: "oven", stage: 1),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "The repair shop says it'll cost $1,500 to fix. We could put it on credit now, or tough it out with the remaining ovens...",
+            poseImageName: "oven",
+            stage: 1,
+            choices: [
+                DialogueChoice(
+                    label: "Pay $1,500 on Credit",
+                    response: "Ooh, a magic plastic card! So we get a shiny fixed oven right now and I can keep making my signature 'Bamboo-zled' brownies? That sounds like a piece of cake! ... Wait... the bank says if I don't pay them back fast, the $1,500 turns into $1,600... then $1,700? It's like a sourdough starter that grows into a debt monster if I'm not careful!",
+                    eventKey: "oven_repair",
+                    choiceIndex: 0),
+                DialogueChoice(
+                    label: "Bear with the other ovens",
+                    response: "You're right, let's keep the credit card in the cookie jar for now. I'll just have to shuffle my trays between the two tiny ovens left — it'll be like a game of musical chairs... but with hot muffins! Oof, my paws are getting a workout! The line is getting a bit long out there because I can only bake six cookies at a time. I hope the customers don't get 'hangry' while they wait...",
+                    eventKey: "oven_repair",
+                    choiceIndex: 1),
+            ]),
 
-        // Stage 2 – after day 2
-        DialogueLine(speaker: "Eclair", text: "We're making progress. Stay focused!",                            poseImageName: "stand_speak",         stage: 2),
-        DialogueLine(speaker: "Eclair", text: "If we keep this up, we'll pay off the loan in no time.",          poseImageName: "stand_speak_armsout", stage: 2),
+        // ── Stage 2 · ISSUE 2: We Go VIRAL ──────────────────────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Oh my bamboo! Did you see?! That video of me accidentally sneezing powdered sugar on a croissant got a million views! Everyone wants to come to the Bankery now.",
+            poseImageName: "stand_speak_armsout", stage: 2),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "We have so much extra 'dough' from the rush... what do we do with it?!",
+            poseImageName: "stand_speak_armsout",
+            stage: 2,
+            choices: [
+                DialogueChoice(
+                    label: "Put it in the HYSA",
+                    response: "Wait, so the bank pays us just to keep the money there? It's like a snack that grows more snacks while you sleep!",
+                    eventKey: "windfall",
+                    choiceIndex: 0),
+                DialogueChoice(
+                    label: "Buy the rose-gold whisk",
+                    response: "We're superstars now! I saw this whisk online that's made of solid rose gold. It doesn't actually bake faster, but think of how cute it'll look in our next video!",
+                    eventKey: "windfall",
+                    choiceIndex: 1),
+            ]),
+
+        // ── Stage 3 · ISSUE 3: Health Inspector ─────────────────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Oh, bamboo-zlesticks! I thought that permit was a coaster for my tea! $200? That's a lot of cupcakes... What do we do, Assistant?",
+            poseImageName: "stand_worried",
+            stage: 3,
+            choices: [
+                DialogueChoice(
+                    label: "Pay the $200 fine",
+                    response: "You're right. It's better to just take the hit and keep the ovens humming. It hurts my tummy to see that much money go away for a piece of paper, but at least we can keep the doors open and keep our customers happy.",
+                    eventKey: "permit_fine",
+                    choiceIndex: 0),
+                DialogueChoice(
+                    label: "Appeal the fine",
+                    response: "Appeal it? Yeah! Maybe I can convince the council that 'Cute Pandas' should be exempt from paperwork! But... wait... if we appeal, we have to lock the doors until the hearing? That's two whole weeks of no baking! I hope the money we save on the fine is worth the money we lose from having no customers...",
+                    eventKey: "permit_fine",
+                    choiceIndex: 1),
+            ]),
+
+        // ── Stage 4 · SCENE 2: After some time — Investing ──────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Phew! Look at our jars, Assistant! After all that hard work, we actually have a little 'mountain' of extra profit sitting here. It's making me feel like a very fancy business-panda!",
+            poseImageName: "stand_speak_armsout", stage: 4),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "But I was reading this leaf-let... it says that if we just let our money sit in this jar, it doesn't grow. It just... sits. I want our money to be like my bread — I want it to rise!",
+            poseImageName: "stand_speak", stage: 4),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "I heard that if we 'invest' it, our money goes out into the world and brings back friends! But there are so many choices... it's a bit over-beaver-whelming. What's our move?",
+            poseImageName: "stand_speak", stage: 4),
+
+        // ── Stage 5 · END SCENE ──────────────────────────────────────────────
+        DialogueLine(
+            speaker: "Eclair",
+            text: "What a month! You really saved my fur.",
+            poseImageName: "stand_speak_armsout", stage: 5),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "I used to think 'finances' were just scary numbers that lived in a basement, but you showed me they're just another kind of recipe.",
+            poseImageName: "stand_speak", stage: 5),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Whether it's choosing between credit and cash, or letting our 'honey-money' grow in a safe spot, I feel way more confident now!",
+            poseImageName: "stand_speak_armsout", stage: 5),
     ]
 
-    // MARK: - Finance screen dialogue lines (shown inside FinanceView per stage)
+    // MARK: - Finance-screen dialogue (shown inside FinanceView per stage)
     private let allFinanceLines: [DialogueLine] = [
 
-        // Stage 0 – first time seeing the finance screen
-        DialogueLine(speaker: "Eclair", text: "Welcome to the balance sheet! This is how we track the bakery's finances.",                     poseImageName: "stand_speak_armsout", stage: 0),
-        DialogueLine(speaker: "Eclair", text: "On the left you'll see Assets — everything the bakery owns or has money in.",                    poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Checking is our everyday cash account. We pay bills and buy supplies from here.",                poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Savings holds money we've set aside. It earns a little interest over time — nice!",              poseImageName: "stand_speak_armsout", stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Investment is money we've put into growing the business — think new equipment funds.",           poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Inventory is the value of all the pastries and ingredients we have on hand.",                    poseImageName: "stand_speak_armsout", stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Equipment is the worth of our ovens, mixers, and tools. They lose value slowly over time.",      poseImageName: "stand_worried",        stage: 0),
-        DialogueLine(speaker: "Eclair", text: "On the right are Liabilities — money we owe to others.",                                        poseImageName: "stand_speak",         stage: 0),
-        DialogueLine(speaker: "Eclair", text: "The Loan is what we borrowed to open the bakery. Our goal is to get it to zero!",               poseImageName: "stand_worried",        stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Accounts Payable is what we owe suppliers for ingredients we already used.",                    poseImageName: "stand_worried",        stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Net Worth = Total Assets minus Total Liabilities. Keep it positive and growing!",                poseImageName: "stand_speak_armsout", stage: 0),
-        DialogueLine(speaker: "Eclair", text: "Got it? Great! Tap Next Week to see what happens after our first week of business!",             poseImageName: "stand_speak_armsout", stage: 0),
+        // Stage 0 – balance sheet tutorial
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Welcome to the balance sheet! Think of it as the Bankery's recipe card for money.",
+            poseImageName: "stand_speak_armsout", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "On the left are Assets — everything we own. Checking is our everyday cash drawer; we pay bills and buy supplies from here.",
+            poseImageName: "stand_speak", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Savings is money tucked away for later. It earns a little interest — like bread that rises overnight!",
+            poseImageName: "stand_speak_armsout", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Investment is money working hard in the background to grow over time — roughly 7% a year!",
+            poseImageName: "stand_speak", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Inventory is our pastries and ingredients on hand. Equipment covers our ovens and mixers — they lose a tiny bit of value each week.",
+            poseImageName: "stand_speak_armsout", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "On the right are Liabilities — money we still owe. The Loan is what we borrowed to open the Bankery. Our goal: get it to zero!",
+            poseImageName: "stand_worried", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Net Worth = Total Assets minus Total Liabilities. Keep it positive and growing!",
+            poseImageName: "stand_speak_armsout", stage: 0),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Got it? Wonderful! Tap 'Next Week' and let's start our first week of business! Want me to look over your decisions? Just ask!",
+            poseImageName: "stand_speak_armsout", stage: 0),
 
-        // Stage 1 – after week 1
-        DialogueLine(speaker: "Eclair", text: "See how the numbers shifted? Revenue came in and we paid some bills.",                          poseImageName: "stand_speak",         stage: 1),
-        DialogueLine(speaker: "Eclair", text: "Accounts Payable went up — we ordered more flour and butter for next week.",                    poseImageName: "stand_worried",        stage: 1),
-        DialogueLine(speaker: "Eclair", text: "If Checking ever hits zero it's game over, so always keep some cash there!",                    poseImageName: "stand_worried",        stage: 1),
-        DialogueLine(speaker: "Eclair", text: "Ready for another week? Tap Next Week!",                                                        poseImageName: "stand_speak_armsout", stage: 1),
+        // Stage 1 – after oven issue
+        DialogueLine(
+            speaker: "Eclair",
+            text: "See how the numbers shifted after our oven situation? Every decision leaves a mark on the balance sheet!",
+            poseImageName: "stand_speak", stage: 1),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "If we used credit, notice the Loan went up — interest will quietly grow on that extra debt each week.",
+            poseImageName: "stand_worried", stage: 1),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Ready to keep baking? Tap 'Next Week'!",
+            poseImageName: "stand_speak_armsout", stage: 1),
 
-        // Stage 2 – after week 2
-        DialogueLine(speaker: "Eclair", text: "Great job so far! The loan balance is slowly shrinking.",                                        poseImageName: "stand_speak_armsout", stage: 2),
-        DialogueLine(speaker: "Eclair", text: "Keep Savings healthy — it's our safety net if Checking ever dips.",                             poseImageName: "stand_speak",         stage: 2),
-        DialogueLine(speaker: "Eclair", text: "Inventory is down — we sold a lot of pastries this week. Profitable!",                          poseImageName: "stand_speak_armsout", stage: 2),
-        DialogueLine(speaker: "Eclair", text: "Every week we pay down the loan a little more. We're getting there!",                           poseImageName: "stand_speak_armsout", stage: 2),
+        // Stage 2 – after viral video
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Look at those numbers glow! Going viral gave our Checking account a real boost.",
+            poseImageName: "stand_speak_armsout", stage: 2),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Moving money to Savings earns interest over time. Spending it is fun, but watch that Loan balance!",
+            poseImageName: "stand_speak", stage: 2),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Tap 'Next Week' and let's ride this wave! Want me to look over your decisions? Just ask!",
+            poseImageName: "stand_speak_armsout", stage: 2),
+
+        // Stage 3 – after health inspector
+        DialogueLine(
+            speaker: "Eclair",
+            text: "The permit situation is handled. Every choice has a financial consequence — you're learning how to read the recipe!",
+            poseImageName: "stand_speak", stage: 3),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Paying a fine hurts a little now but keeps revenue flowing. Appealing saves the fine but loses income for weeks — always weigh the tradeoff!",
+            poseImageName: "stand_worried", stage: 3),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Tap 'Next Week' and let's keep the ovens humming! Want me to look over your decisions? Just ask!",
+            poseImageName: "stand_speak_armsout", stage: 3),
+
+        // Stage 4 – investing
+        DialogueLine(
+            speaker: "Eclair",
+            text: "This is our Investment account — money we've put to work, growing at roughly 7% a year.",
+            poseImageName: "stand_speak_armsout", stage: 4),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Each week it earns a return automatically. That's compound growth — your money makes more money while you sleep!",
+            poseImageName: "stand_speak", stage: 4),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "The bigger the Investment balance, the faster it grows. Consider transferring some Savings there to put it to work.",
+            poseImageName: "stand_speak_armsout", stage: 4),
+        DialogueLine(
+            speaker: "Eclair",
+            text: "Amazing work this month! Tap 'Next Week' to see your final results.",
+            poseImageName: "stand_speak_armsout", stage: 4),
     ]
 
     // MARK: - Current stage lines

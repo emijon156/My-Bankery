@@ -50,6 +50,12 @@ struct HomeView: View {
             }
             .matchedTransitionSource(id: "start", in: zoomNamespace)
         }
+        .onChange(of: financeViewModel.shouldResetToHome) { _, newValue in
+            if newValue {
+                goToDialogue = false
+                financeViewModel.shouldResetToHome = false
+            }
+        }
     }
 }
 

@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 class FinanceViewModel {
 
@@ -27,6 +28,15 @@ class FinanceViewModel {
     var errorMessage: String? = nil
     var actionLoading: Bool   = false
     var actionError: String?  = nil
+    var topTickers: [TopTicker]    = []
+    var investmentsLoading: Bool   = false
+    var investmentsError: String?  = nil
+
+    /// Finance-screen actions logged this week; cleared when Next Week fires.
+    var sessionActions: [String] = []
+
+    /// Set to true by any "Play Again" button; HomeView watches this to pop to root.
+    var shouldResetToHome: Bool = false
 
     // MARK: - Private Session IDs (persisted across turns, sent with every request)
     private var accountIDs: AccountIDs?
@@ -57,8 +67,16 @@ class FinanceViewModel {
     ]}
 
     // MARK: - Networking
-    private let baseURL = "http://MacBook-Pro-1513.local:8000"
-    private let session = URLSession.shared
+    // Cloudflare Tunnel — public HTTPS URL that bypasses eduroam restrictions.
+    // Restart cloudflared if this URL expires:
+    //   cloudflared tunnel --url http://localhost:8000
+    private let baseURL = "https://intelligence-supplied-arrangements-reflect.trycloudflare.com"
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest  = 15
+        config.timeoutIntervalForResource = 30
+        return URLSession(configuration: config)
+    }()
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
@@ -100,11 +118,16 @@ class FinanceViewModel {
             inventoryValue  = 1_000
             equipmentValue  = 5_000
 
-            currentWeek = 0
-            outcome     = .ongoing
-            alerts      = []
+            currentWeek    = 0
+            outcome        = .ongoing
+            alerts         = []
+            sessionActions = []
 
+        } catch let decodingError as DecodingError {
+            print("[Bankery] Decoding error: \(decodingError)")
+            errorMessage = decodingError.localizedDescription
         } catch {
+            print("[Bankery] Network error: \(error)")
             errorMessage = error.localizedDescription
         }
 
@@ -149,6 +172,7 @@ class FinanceViewModel {
             equipmentValue    = result.equipment
             currentWeek       = result.week
             alerts            = result.alerts
+            sessionActions    = []   // clear for the new week
 
             switch result.gameOutcome {
             case "won":  outcome = .won
@@ -180,6 +204,8 @@ class FinanceViewModel {
         actionError       = nil
         accountIDs        = nil
         merchantIDs       = nil
+        sessionActions    = []
+        shouldResetToHome = false
     }
 
     // MARK: - Private Helpers
@@ -207,6 +233,13 @@ class FinanceViewModel {
         }
     }
 
+    // MARK: - Helper Methods
+    
+    /// Clear action errors when user starts typing or changes input
+    func clearActionError() {
+        actionError = nil
+    }
+
     // MARK: - Transfer
 
     func transfer(from: AccountType, to: AccountType, amount: Double) async {
@@ -231,8 +264,12 @@ class FinanceViewModel {
             let (data, response) = try await session.data(for: request)
             try validateResponse(response)
             let result = try decoder.decode(ActionResult.self, from: data)
+            if let err = result.error { actionError = err; actionLoading = false; return }
             if let b = result.fromBalance { applyBalance(for: from, value: b) }
             if let b = result.toBalance   { applyBalance(for: to,   value: b) }
+            let fmt = NumberFormatter(); fmt.numberStyle = .currency; fmt.currencyCode = "USD"
+            let amtStr = fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+            sessionActions.append("Transferred \(amtStr) from \(from.rawValue) to \(to.rawValue)")
         } catch {
             actionError = error.localizedDescription
         }
@@ -257,8 +294,12 @@ class FinanceViewModel {
             let (data, response) = try await session.data(for: request)
             try validateResponse(response)
             let result = try decoder.decode(ActionResult.self, from: data)
+            if let err = result.error { actionError = err; actionLoading = false; return }
             if let b = result.checking { checkingBalance = b }
             if let b = result.loan     { loanBalance     = b }
+            let fmt = NumberFormatter(); fmt.numberStyle = .currency; fmt.currencyCode = "USD"
+            let amtStr = fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+            sessionActions.append("Paid \(amtStr) toward loan")
         } catch {
             actionError = error.localizedDescription
         }
@@ -281,8 +322,12 @@ class FinanceViewModel {
             let (data, response) = try await session.data(for: request)
             try validateResponse(response)
             let result = try decoder.decode(ActionResult.self, from: data)
+            if let err = result.error { actionError = err; actionLoading = false; return }
             if let b = result.checking { checkingBalance = b }
             if let b = result.loan     { loanBalance     = b }
+            let fmt = NumberFormatter(); fmt.numberStyle = .currency; fmt.currencyCode = "USD"
+            let amtStr = fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+            sessionActions.append("Took out a \(amtStr) loan")
         } catch {
             actionError = error.localizedDescription
         }
@@ -311,8 +356,12 @@ class FinanceViewModel {
             let (data, response) = try await session.data(for: request)
             try validateResponse(response)
             let result = try decoder.decode(ActionResult.self, from: data)
+            if let err = result.error { actionError = err; actionLoading = false; return }
             if let b = result.checking { checkingBalance = b }
             inventoryValue += amount
+            let fmt = NumberFormatter(); fmt.numberStyle = .currency; fmt.currencyCode = "USD"
+            let amtStr = fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+            sessionActions.append("Bought \(amtStr) of bakery inventory")
         } catch {
             actionError = error.localizedDescription
         }
@@ -339,18 +388,112 @@ class FinanceViewModel {
             let (data, response) = try await session.data(for: request)
             try validateResponse(response)
             let result = try decoder.decode(ActionResult.self, from: data)
+            if let err = result.error { actionError = err; actionLoading = false; return }
             if let b = result.checking { checkingBalance = b }
             equipmentValue += amount
+            let fmt = NumberFormatter(); fmt.numberStyle = .currency; fmt.currencyCode = "USD"
+            let amtStr = fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+            sessionActions.append("Upgraded equipment for \(amtStr)")
         } catch {
             actionError = error.localizedDescription
         }
         actionLoading = false
     }
 
+    // MARK: - Eclair Gemini Reflection
+
+    /// Sends this week's finance-screen actions + live balances to Gemini Flash via the backend.
+    /// Returns Eclair's in-character reflection, or a fallback if the call fails.
+    /// Never throws — always returns a displayable string.
+    func askEclair(actions: [String]) async -> String {
+        guard let url = URL(string: "\(baseURL)/api/eclair/reflect") else {
+            return eclairFallback()
+        }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = EclairReflectRequest(
+            actionsSummary: actions,
+            checking:       checkingBalance,
+            savings:        savingsBalance,
+            loan:           loanBalance,
+            week:           currentWeek
+        )
+        request.httpBody = try? encoder.encode(body)
+        do {
+            let (data, response) = try await session.data(for: request)
+            try validateResponse(response)
+            let result = try decoder.decode(EclairReflectResponse.self, from: data)
+            return result.reflection
+        } catch {
+            print("[Eclair] Error fetching reflection: \(error)")
+            return eclairFallback()
+        }
+    }
+
+    private func eclairFallback() -> String {
+        "Oof, my brain got a bit over-proofed there! But every good baker learns from their batter mistakes"
+    }
+
+    // MARK: - Investments
+
+    /// Fetches live price + daily change for the top 5 tickers from /api/investments/top.
+    func fetchTopInvestments() async {
+        investmentsLoading = true
+        investmentsError   = nil
+        guard let url = URL(string: "\(baseURL)/api/investments/top") else {
+            investmentsLoading = false; return
+        }
+        do {
+            let (data, response) = try await session.data(from: url)
+            try validateResponse(response)
+            let result  = try decoder.decode(TopInvestmentsResponse.self, from: data)
+            topTickers  = result.tickers
+        } catch {
+            investmentsError = error.localizedDescription
+        }
+        investmentsLoading = false
+    }
+
+    // MARK: - Events (narrative choice outcomes)
+
+    /// Called by DialogueView when the player selects a choice option.
+    /// Hits POST /api/events/{key} and updates balances in place.
+    func applyEvent(key: String, choice: Int) async {
+        guard let ids = accountIDs else { return }
+        guard let url = URL(string: "\(baseURL)/api/events/\(key)") else { return }
+        var request        = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = EventRequest(
+            choiceIndex: choice,
+            checkingId:  ids.checkingId,
+            savingsId:   ids.savingsId,
+            loanId:      ids.loanId
+        )
+        request.httpBody = try? encoder.encode(body)
+        do {
+            let (data, response) = try await session.data(for: request)
+            try validateResponse(response)
+            let result = try decoder.decode(EventResult.self, from: data)
+            if let b = result.checking { checkingBalance = b }
+            if let b = result.savings  { savingsBalance  = b }
+            if let b = result.loan     { loanBalance     = b }
+            let alertType = result.alertType ?? "info"
+            alerts.append(GameAlert(type: alertType, message: result.message))
+        } catch {
+            // Non-critical — event effects are cosmetic during dialogue; don't crash the game.
+            print("[Event] \(key) error: \(error)")
+        }
+    }
+
     // MARK: - Ledger
 
     func fetchLedger() async -> LedgerData? {
-        guard let ids = accountIDs else { return nil }
+        guard let ids = accountIDs else {
+            print("[Ledger] FAIL: accountIDs is nil — initGame() failed or hasn't run")
+            return nil
+        }
         var components = URLComponents(string: "\(baseURL)/api/ledger")
         components?.queryItems = [
             URLQueryItem(name: "checking_id",   value: ids.checkingId),
@@ -362,8 +505,11 @@ class FinanceViewModel {
         do {
             let (data, response) = try await session.data(from: url)
             try validateResponse(response)
-            return try decoder.decode(LedgerData.self, from: data)
+            let decoded = try decoder.decode(LedgerData.self, from: data)
+            print("[Ledger] OK — \(decoded.checking.allTransactions.count) checking txns")
+            return decoded
         } catch {
+            print("[Ledger] FAIL: \(error)")
             return nil
         }
     }

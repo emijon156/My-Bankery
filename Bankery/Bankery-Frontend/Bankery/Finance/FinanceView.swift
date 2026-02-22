@@ -19,10 +19,16 @@ struct FinanceView: View {
     @State private var hasAppeared: Bool = false
 
     // Action sheets
-    @State private var showTransfer: Bool = false
-    @State private var showLoan:     Bool = false
-    @State private var showShop:     Bool = false
-    @State private var showLedger:   Bool = false
+    @State private var showTransfer:     Bool = false
+    @State private var showLoan:         Bool = false
+    //@State private var showShop:         Bool = false
+    @State private var showLedger:       Bool = false
+    @State private var showInvestments:  Bool = false
+
+    // Ask Eclair
+    @State private var showEclairSheet:      Bool   = false
+    @State private var eclairReflecting:     Bool   = false
+    @State private var eclairReflectionText: String = ""
 
     // Scroll tracking
     @State private var scrollOffset: CGFloat = 0
@@ -175,15 +181,67 @@ struct FinanceView: View {
 
                             // Action buttons — always visible
                             HStack(spacing: 10) {
-                                actionButton("Transfer", icon: "arrow.left.arrow.right", color: .blue)   { showTransfer = true }
-                                actionButton("Loan",     icon: "banknote",                color: .orange) { showLoan     = true }
-                                actionButton("Shop",     icon: "cart.fill",              color: .green)  { showShop     = true }
-                                actionButton("History",  icon: "list.bullet.rectangle",  color: .purple) { showLedger   = true }
+                                actionButton("Transfer")   { showTransfer = true }
+                                actionButton("Loan") { showLoan     = true }
+                                //actionButton("Shop",     icon: "cart.fill",              color: .green)  { showShop     = true }
+                                actionButton("History") { showLedger   = true }
                             }
                             .padding(.horizontal)
 
+                            // Investments button — unlocked at Stage 4
+                            if stage >= 4 {
+                                Button(action: { showInvestments = true }) {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "chart.line.uptrend.xyaxis")
+                                            .font(.title2)
+                                        Text("Investments")
+                                            .font(.custom("Cute-Dino", size: 22))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(red: 0.07, green: 0.45, blue: 0.26),
+                                                     Color(red: 0.12, green: 0.60, blue: 0.38)],
+                                            startPoint: .leading, endPoint: .trailing)
+                                    )
+                                    .cornerRadius(14)
+                                }
+                                .padding(.horizontal)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+
                             // Next Week button — unlocked after all dialogue
                             if dialogueDone {
+                                // Ask Eclair button
+                                Button(action: {
+                                    let actions = financeViewModel.sessionActions
+                                    showEclairSheet  = true
+                                    eclairReflecting = true
+                                    eclairReflectionText = ""
+                                    Task {
+                                        let text = await financeViewModel.askEclair(actions: actions)
+                                        eclairReflecting     = false
+                                        eclairReflectionText = text
+                                    }
+                                }) {
+                                    HStack(spacing: 10) {
+                                        Text("Ask Eclair")
+                                            .font(.custom("Cute-Dino", size: 22))
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color(red: 0.45, green: 0.22, blue: 0.60))
+                                    )
+                                }
+                                .padding(.horizontal)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+
                                 Button(action: {
                                     Task {
                                         await financeViewModel.nextWeek()
@@ -210,12 +268,14 @@ struct FinanceView: View {
                             }
                         }
                         .padding(.horizontal, 142)
-                        .padding(.top, 120)
+                        //.padding(.top, 120)
                         .padding(.bottom, geo.size.height * 0.28)
                         .animation(.easeInOut, value: dialogueDone)
                         .background(
                             GeometryReader { inner in
                                 Color.clear
+                                    .onAppear { contentHeight = inner.size.height }
+                                    .onChange(of: inner.size.height) { _, h in contentHeight = h }
                                     .preference(key: ScrollOffsetKey.self,
                                                 value: inner.frame(in: .named("scrollArea")).minY)
                             }
@@ -224,21 +284,21 @@ struct FinanceView: View {
                             scrollOffset = -val
                         }
                     }
-                    .coordinateSpace(name: "scrollArea")
                     } // end HStack
+                    .coordinateSpace(name: "scrollArea")
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 80)
+                    .padding(.top, 100)
                     .padding(.bottom, 160)
                     .clipped()
                     .overlay(alignment: .topTrailing) {
                         ScrollIndicatorView(
                             contentHeight: contentHeight,
                             scrollOffset: scrollOffset,
-                            availableHeight: geo.size.height - 50 - 100
+                            availableHeight: geo.size.height - 100 - 160
                         )
                         .frame(width: 6)
                         .padding(.top, 100)
-                        .padding(.bottom, 80)
+                        .padding(.bottom, 160)
                         .padding(.trailing, 80)
                     }
 
@@ -262,12 +322,12 @@ struct FinanceView: View {
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(dialogueViewModel.currentLine.speaker)
-                                        .font(.custom("Cute-Dino", size: 42))
+                                        .font(.custom("Cute-Dino", size: 35))
                                         .fontWeight(.semibold)
                                         .foregroundColor(.white)
 
                                     Text(displayedText)
-                                        .font(.custom("Cute-Dino", size: 32))
+                                        .font(.custom("Cute-Dino", size: 25))
                                         .foregroundColor(.white)
                                         .multilineTextAlignment(.leading)
                                         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -321,8 +381,15 @@ struct FinanceView: View {
         }
         .navigationDestination(isPresented: $showTransfer) { TransferView().environment(financeViewModel) }
         .navigationDestination(isPresented: $showLoan)     { LoanView().environment(financeViewModel) }
-        .navigationDestination(isPresented: $showShop)     { ShopView().environment(financeViewModel) }
+        //.navigationDestination(isPresented: $showShop)     { ShopView().environment(financeViewModel) }
         .navigationDestination(isPresented: $showLedger)   { LedgerView().environment(financeViewModel) }
+        .navigationDestination(isPresented: $showInvestments) { InvestmentView().environment(financeViewModel) }
+        .sheet(isPresented: $showEclairSheet) {
+            EclairReflectionSheet(
+                isReflecting: eclairReflecting,
+                reflectionText: eclairReflectionText
+            )
+        }
         .onAppear {
             guard !hasAppeared else { return }
             hasAppeared = true
@@ -336,12 +403,9 @@ struct FinanceView: View {
 
     // MARK: - Action Button
 
-    private func actionButton(_ label: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(color)
                 Text(label)
                     .font(.custom("Cute-Dino", size: 13))
                     .foregroundColor(.primary)
@@ -416,14 +480,17 @@ struct FinanceView: View {
 
     private func outcomeScreen(title: String, subtitle: String, won: Bool) -> some View {
         VStack(spacing: 24) {
-            Text(won ? "🎉" : "💸").font(.system(size: 80))
+            Text(won ? "" : "").font(.system(size: 80))
             Text(title).font(.custom("Cute-Dino", size: 36)).fontWeight(.bold)
             Text(subtitle)
                 .font(.custom("Cute-Dino", size: 20))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-            Button(action: { financeViewModel.reset() }) {
+            Button(action: {
+                financeViewModel.reset()
+                financeViewModel.shouldResetToHome = true
+            }) {
                 Text("Play Again")
                     .font(.custom("Cute-Dino", size: 22))
                     .foregroundColor(.white)
@@ -448,6 +515,65 @@ struct FinanceView: View {
 #Preview(traits: .landscapeLeft) {
     NavigationStack { FinanceView(stage: 0) }
         .environment(FinanceViewModel())
+}
+
+// MARK: - Eclair Reflection Sheet
+
+struct EclairReflectionSheet: View {
+    let isReflecting: Bool
+    let reflectionText: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Text("Eclair's Take")
+                    .font(.custom("Cute-Dino", size: 30))
+                    .fontWeight(.bold)
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            if isReflecting {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Hmm, let me think... ")
+                        .font(.custom("Cute-Dino", size: 22))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if reflectionText.isEmpty {
+                Text("Tap \"Ask Eclair\" to get Eclair's thoughts on your moves this week!")
+                    .font(.custom("Cute-Dino", size: 20))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                ScrollView {
+                    Text(reflectionText)
+                        .font(.custom("Cute-Dino", size: 24))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(red: 54/255, green: 54/255, blue: 54/255).opacity(0.08))
+                        )
+                }
+            }
+
+            Spacer()
+        }
+        .padding(28)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
 }
 
 // MARK: - Scroll helpers
