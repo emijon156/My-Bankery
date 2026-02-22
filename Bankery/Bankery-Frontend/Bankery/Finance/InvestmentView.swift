@@ -18,10 +18,9 @@ struct InvestmentView: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                     .ignoresSafeArea()
 
-                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
 
-
+                        // ── Navigation bar ──────────────────────────────────
                         HStack {
                             Button { dismiss() } label: {
                                 HStack(spacing: 6) {
@@ -44,7 +43,7 @@ struct InvestmentView: View {
                             .opacity(0)
                         }
 
-
+                        // ── Eclair tip ──────────────────────────────────────
                         HStack(spacing: 12) {
                             Image("stand_speak_armsout")
                                 .resizable()
@@ -60,6 +59,7 @@ struct InvestmentView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(14)
 
+                        // ── Ticker Cards ────────────────────────────────────
                         if vm.investmentsLoading {
                             ProgressView("Loading market data…")
                                 .font(.custom("Cute-Dino", size: 16))
@@ -90,6 +90,7 @@ struct InvestmentView: View {
                             }
                         }
 
+                        // ── Fidelity CTA ────────────────────────────────────
                         VStack(spacing: 8) {
                             Text("Ready to invest for real?")
                                 .font(.custom("Cute-Dino", size: 18))
@@ -118,11 +119,10 @@ struct InvestmentView: View {
                             }
                         }
                         .padding(.top, 8)
-                        .padding(.bottom, geo.size.height * 0.28)
+                        .padding(.bottom, geo.size.height * 0.21)
                     }
                     .padding(.horizontal, 142)
                     .padding(.top, 120)
-                }
             }
         }
         .navigationBarHidden(true)

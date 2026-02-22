@@ -143,95 +143,95 @@ class DialogueViewModel {
         DialogueLine(
             speaker: "Eclair",
             text: "Welcome to the balance sheet! Think of it as the Bankery's recipe card for money.",
-            poseImageName: "stand_speak_armsout", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "On the left are Assets — everything we own. Checking is our everyday cash drawer; we pay bills and buy supplies from here.",
-            poseImageName: "stand_speak", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "Savings is money tucked away for later. It earns a little interest — like bread that rises overnight!",
-            poseImageName: "stand_speak_armsout", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "Investment is money working hard in the background to grow over time — roughly 7% a year!",
-            poseImageName: "stand_speak", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "Inventory is our pastries and ingredients on hand. Equipment covers our ovens and mixers — they lose a tiny bit of value each week.",
-            poseImageName: "stand_speak_armsout", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "On the right are Liabilities — money we still owe. The Loan is what we borrowed to open the Bankery. Our goal: get it to zero!",
-            poseImageName: "stand_worried", stage: 0),
+            poseImageName: "head_worried", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "Net Worth = Total Assets minus Total Liabilities. Keep it positive and growing!",
-            poseImageName: "stand_speak_armsout", stage: 0),
+            poseImageName: "head_speak", stage: 0),
         DialogueLine(
             speaker: "Eclair",
             text: "Got it? Wonderful! Tap 'Next Week' and let's start our first week of business! Want me to look over your decisions? Just ask!",
-            poseImageName: "stand_speak_armsout", stage: 0),
+            poseImageName: "head_speak", stage: 0),
 
         // Stage 1 – after oven issue
         DialogueLine(
             speaker: "Eclair",
             text: "See how the numbers shifted after our oven situation? Every decision leaves a mark on the balance sheet!",
-            poseImageName: "stand_speak", stage: 1),
+            poseImageName: "head_speak", stage: 1),
         DialogueLine(
             speaker: "Eclair",
             text: "If we used credit, notice the Loan went up — interest will quietly grow on that extra debt each week.",
-            poseImageName: "stand_worried", stage: 1),
+            poseImageName: "head_worried", stage: 1),
         DialogueLine(
             speaker: "Eclair",
             text: "Ready to keep baking? Tap 'Next Week'!",
-            poseImageName: "stand_speak_armsout", stage: 1),
+            poseImageName: "head_speak", stage: 1),
 
         // Stage 2 – after viral video
         DialogueLine(
             speaker: "Eclair",
             text: "Look at those numbers glow! Going viral gave our Checking account a real boost.",
-            poseImageName: "stand_speak_armsout", stage: 2),
+            poseImageName: "head_speak", stage: 2),
         DialogueLine(
             speaker: "Eclair",
             text: "Moving money to Savings earns interest over time. Spending it is fun, but watch that Loan balance!",
-            poseImageName: "stand_speak", stage: 2),
+            poseImageName: "head_speak", stage: 2),
         DialogueLine(
             speaker: "Eclair",
             text: "Tap 'Next Week' and let's ride this wave! Want me to look over your decisions? Just ask!",
-            poseImageName: "stand_speak_armsout", stage: 2),
+            poseImageName: "head_speak", stage: 2),
 
         // Stage 3 – after health inspector
         DialogueLine(
             speaker: "Eclair",
             text: "The permit situation is handled. Every choice has a financial consequence — you're learning how to read the recipe!",
-            poseImageName: "stand_speak", stage: 3),
+            poseImageName: "head_speak", stage: 3),
         DialogueLine(
             speaker: "Eclair",
             text: "Paying a fine hurts a little now but keeps revenue flowing. Appealing saves the fine but loses income for weeks — always weigh the tradeoff!",
-            poseImageName: "stand_worried", stage: 3),
+            poseImageName: "head_worried", stage: 3),
         DialogueLine(
             speaker: "Eclair",
             text: "Tap 'Next Week' and let's keep the ovens humming! Want me to look over your decisions? Just ask!",
-            poseImageName: "stand_speak_armsout", stage: 3),
+            poseImageName: "head_speak", stage: 3),
 
         // Stage 4 – investing
         DialogueLine(
             speaker: "Eclair",
             text: "This is our Investment account — money we've put to work, growing at roughly 7% a year.",
-            poseImageName: "stand_speak_armsout", stage: 4),
+            poseImageName: "head_speak", stage: 4),
         DialogueLine(
             speaker: "Eclair",
             text: "Each week it earns a return automatically. That's compound growth — your money makes more money while you sleep!",
-            poseImageName: "stand_speak", stage: 4),
+            poseImageName: "head_speak", stage: 4),
         DialogueLine(
             speaker: "Eclair",
             text: "The bigger the Investment balance, the faster it grows. Consider transferring some Savings there to put it to work.",
-            poseImageName: "stand_speak_armsout", stage: 4),
+            poseImageName: "head_speak", stage: 4),
         DialogueLine(
             speaker: "Eclair",
             text: "Amazing work this month! Tap 'Next Week' to see your final results.",
-            poseImageName: "stand_speak_armsout", stage: 4),
+            poseImageName: "head_speak", stage: 4),
     ]
 
     // MARK: - Current stage lines
@@ -254,6 +254,7 @@ class DialogueViewModel {
         currentIndex += 1
     }
 
+    /// Load intro-scene lines for the given stage.
     func loadStage(_ stage: Int) {
         let filtered = allLines.filter { $0.stage == stage }
         lines        = filtered.isEmpty ? allLines.filter { $0.stage == 0 } : filtered
@@ -261,6 +262,7 @@ class DialogueViewModel {
         currentStage = stage
     }
 
+    /// Load finance-screen lines for the given stage.
     func loadFinanceStage(_ stage: Int) {
         let filtered = allFinanceLines.filter { $0.stage == stage }
         lines        = filtered.isEmpty ? allFinanceLines.filter { $0.stage == 0 } : filtered

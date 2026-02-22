@@ -58,7 +58,7 @@ class FinanceViewModel {
     ]}
 
     // MARK: - Networking
-    private let baseURL = "https://intelligence-supplied-arrangements-reflect.trycloudflare.com"
+    private let baseURL = "https://babies-generated-surgery-gateway.trycloudflare.com"
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 15

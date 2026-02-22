@@ -201,15 +201,19 @@ async def eclair_reflect(req: EclairReflectRequest):
     )
     try:
         response = await _GENAI_CLIENT.aio.models.generate_content(
-            model="models/gemma-3-27b-it",
+            model="models/gemini-2.5-flash",
             contents=prompt,
             config=genai_types.GenerateContentConfig(
                 system_instruction=_ECLAIR_SYSTEM,
-                max_output_tokens=2048,
+                max_output_tokens=512,
                 temperature=0.7,
+                thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
             ),
         )
-        return EclairReflectResponse(reflection=response.text.strip())
+        text = response.text
+        if not text:
+            raise ValueError(f"Empty response (finish={response.candidates[0].finish_reason if response.candidates else 'none'})")
+        return EclairReflectResponse(reflection=text.strip())
     except Exception as e:
         print(f"[Eclair] error: {e}")
         return EclairReflectResponse(

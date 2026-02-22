@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct DialogueView: View {
     let stage: Int
@@ -19,6 +20,9 @@ struct DialogueView: View {
     @State private var displayedText: String = ""
     @State private var isTyping: Bool = false
     @State private var typingTask: Task<Void, Never>? = nil
+
+    // Audio
+    @State private var audio = AudioPlayerManager()
 
     // Choice state
     @State private var pendingChoiceResponse: String? = nil
@@ -235,6 +239,7 @@ struct DialogueView: View {
         typingTask?.cancel()
         displayedText = ""
         isTyping = true
+        audio.play()
         typingTask = Task {
             for char in fullText {
                 if Task.isCancelled { break }
@@ -242,12 +247,14 @@ struct DialogueView: View {
                 if Task.isCancelled { break }
                 displayedText.append(char)
             }
+            audio.stop()
             isTyping = false
         }
     }
 
     private func skipTyping() {
         typingTask?.cancel()
+        audio.stop()
         displayedText = pendingChoiceResponse ?? viewModel.currentLine.text
         isTyping = false
     }
