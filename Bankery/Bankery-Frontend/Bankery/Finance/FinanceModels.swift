@@ -1,10 +1,3 @@
-//
-//  FinanceModels.swift
-//  Bankery
-//
-//  Created by Emily Jon on 2/21/26.
-//
-
 import Foundation
 
 // MARK: - Init Response  (POST /api/game/init)

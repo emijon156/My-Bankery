@@ -63,7 +63,6 @@ struct TransferView: View {
                 ScrollView {
                     VStack(spacing: 20) {
 
-                        // ── Back button + title ──
                         HStack {
                             Button { dismiss() } label: {
                                 HStack(spacing: 6) {
@@ -85,7 +84,6 @@ struct TransferView: View {
                             .opacity(0)
                         }
 
-                        // ── Balance Cards ──
                         HStack(spacing: 0) {
                             balanceCell("Checking",   amount: vm.checkingBalance,   color: .blue)
                             Divider()
@@ -96,14 +94,11 @@ struct TransferView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(14)
 
-                        // ── From / To Pickers ──
                         accountPicker(label: "From", selection: $fromAccount)
                         accountPicker(label: "To",   selection: $toAccount)
 
-                        // ── Amount ──
                         amountField
 
-                        // ── Feedback ──
                         if let err = vm.actionError {
                             feedbackBanner(err, isError: true)
                         } else if let err = validationError, !amountText.isEmpty {
@@ -113,7 +108,6 @@ struct TransferView: View {
                             feedbackBanner("Transfer complete!", isError: false)
                         }
 
-                        // ── Confirm Button ──
                         Button {
                             Task {
                                 await vm.transfer(from: fromAccount, to: toAccount, amount: amount)
@@ -149,7 +143,6 @@ struct TransferView: View {
                     .padding(.bottom, geo.size.height * 0.28)
                 }
 
-                // ── Dialogue Panel (bottom 1/4) ──
                 VStack {
                     Spacer()
                     ZStack(alignment: .topLeading) {

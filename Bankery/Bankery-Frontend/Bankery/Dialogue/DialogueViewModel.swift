@@ -254,7 +254,6 @@ class DialogueViewModel {
         currentIndex += 1
     }
 
-    /// Load intro-scene lines for the given stage.
     func loadStage(_ stage: Int) {
         let filtered = allLines.filter { $0.stage == stage }
         lines        = filtered.isEmpty ? allLines.filter { $0.stage == 0 } : filtered
@@ -262,7 +261,6 @@ class DialogueViewModel {
         currentStage = stage
     }
 
-    /// Load finance-screen lines for the given stage.
     func loadFinanceStage(_ stage: Int) {
         let filtered = allFinanceLines.filter { $0.stage == stage }
         lines        = filtered.isEmpty ? allFinanceLines.filter { $0.stage == 0 } : filtered

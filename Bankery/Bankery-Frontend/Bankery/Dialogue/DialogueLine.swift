@@ -8,7 +8,6 @@
 import Foundation
 
 // MARK: - Choice Option
-/// Represents one button shown when a DialogueLine presents a decision.
 struct DialogueChoice: Identifiable {
     let id = UUID()
     let label: String        // short button label shown to the player

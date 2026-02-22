@@ -1,47 +1,3 @@
-"""
-main.py
-Bankery FastAPI backend — v2.0
-
-Exposes the full Bankery game loop and every Nessie API surface to the
-SwiftUI frontend over HTTP.
-
-Run locally:
-    uvicorn main:app --reload --port 8000
-
-Endpoints
----------
-Game lifecycle
-  POST /api/game/init
-  POST /api/game/next-week
-
-Player actions
-  POST /api/actions/take-loan
-  POST /api/actions/pay-loan
-  POST /api/actions/transfer
-  POST /api/actions/buy-inventory
-  POST /api/actions/upgrade-equipment
-
-Account & transaction data
-  GET  /api/customers/{customer_id}
-  GET  /api/customers/{customer_id}/accounts
-  GET  /api/accounts/{account_id}
-  GET  /api/accounts/{account_id}/deposits
-  GET  /api/accounts/{account_id}/withdrawals
-  GET  /api/accounts/{account_id}/transfers
-  GET  /api/accounts/{account_id}/purchases
-  GET  /api/accounts/{account_id}/bills
-  GET  /api/ledger
-
-Merchant / location data
-  GET  /api/merchants
-  GET  /api/merchants/{merchant_id}
-  GET  /api/atms
-  GET  /api/branches
-
-Report
-  GET  /api/report
-"""
-
 from __future__ import annotations
 
 import os
@@ -52,22 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types as genai_types
 import yfinance as yf
-
-load_dotenv()
-_GENAI_CLIENT = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY", ""),
-    http_options={"api_version": "v1beta"},
-)
-
-_ECLAIR_SYSTEM = (
-    "You are Eclair, an adorably nervous panda who owns the Bankery, a beloved pastry shop. "
-    "You are learning about personal finance and speak in a warm, playful voice full of baking "
-    "metaphors and gentle puns. You are honest about money — not preachy, just real — and always "
-    "keep your response to exactly 2-3 short sentences. Never break character. "
-    "Never use bullet points, lists, or formal language."
-)
-
-
 
 import nessie_client
 import game_engine
@@ -86,11 +26,22 @@ from models import (
     EclairReflectResponse,
 )
 
-app = FastAPI(
-    title="Bankery API",
-    version="2.0.0",
-    description="Bakery finance simulation backed by the Capital One Nessie API.",
+load_dotenv()
+
+_GENAI_CLIENT = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY", ""),
+    http_options={"api_version": "v1beta"},
 )
+
+_ECLAIR_SYSTEM = (
+    "You are Eclair, an adorably nervous panda who owns the Bankery, a beloved pastry shop. "
+    "You are learning about personal finance and speak in a warm, playful voice full of baking "
+    "metaphors and gentle puns. You are honest about money — not preachy, just real — and always "
+    "keep your response to exactly 2-3 short sentences. Never break character. "
+    "Never use bullet points, lists, or formal language."
+)
+
+app = FastAPI(title="Bankery API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -100,35 +51,13 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# Game Lifecycle
-# ---------------------------------------------------------------------------
-
-@app.post("/api/game/init", summary="Initialize a new Bankery game")
+@app.post("/api/game/init")
 def initialize_game():
-    """
-    Creates a Nessie customer, 4 accounts (Checking, Savings, Investment, Loan),
-    3 merchants, and seeds the weekly bill schedule.
-
-    Returns all IDs that the frontend should persist to drive future API calls.
-    """
     return game_engine.setup_game()
 
 
-@app.post("/api/game/next-week", summary="Advance the game by one week")
+@app.post("/api/game/next-week")
 def next_week(req: NextWeekRequest):
-    """
-    Processes one full week:
-      1. Random sales revenue → Nessie deposit
-      2. Fixed expense withdrawals / purchases
-      3. APY credited to savings & investment
-      4. Loan interest charged
-      5. Equipment depreciation applied
-      6. game_outcome returned: "ongoing" | "won" | "lost"
-
-    The frontend sends back the current inventory and equipment values it
-    received on the previous turn so the backend can apply changes statelessly.
-    """
     return game_engine.process_week(
         req.accounts,
         req.merchants,
@@ -138,11 +67,7 @@ def next_week(req: NextWeekRequest):
     )
 
 
-# ---------------------------------------------------------------------------
-# Player Actions
-# ---------------------------------------------------------------------------
-
-@app.post("/api/actions/take-loan", summary="Take out an additional loan")
+@app.post("/api/actions/take-loan")
 def take_loan(req: AddLoanRequest):
     result = game_engine.add_loan(req.checking_id, req.loan_id, req.amount)
     if "error" in result:
@@ -150,7 +75,7 @@ def take_loan(req: AddLoanRequest):
     return result
 
 
-@app.post("/api/actions/pay-loan", summary="Make a loan payment")
+@app.post("/api/actions/pay-loan")
 def pay_loan(req: PayLoanRequest):
     result = game_engine.pay_loan(req.checking_id, req.loan_id, req.amount)
     if "error" in result:
@@ -158,7 +83,7 @@ def pay_loan(req: PayLoanRequest):
     return result
 
 
-@app.post("/api/actions/transfer", summary="Transfer funds between two accounts")
+@app.post("/api/actions/transfer")
 def transfer(req: TransferRequest):
     result = game_engine.transfer_cash(
         req.from_account_id, req.to_account_id, req.amount, req.description
@@ -168,7 +93,7 @@ def transfer(req: TransferRequest):
     return result
 
 
-@app.post("/api/actions/buy-inventory", summary="Buy bakery supplies (Purchases API)")
+@app.post("/api/actions/buy-inventory")
 def buy_inventory(req: BuyInventoryRequest):
     result = game_engine.buy_inventory(
         req.checking_id, req.supply_merchant_id, req.amount
@@ -178,7 +103,7 @@ def buy_inventory(req: BuyInventoryRequest):
     return result
 
 
-@app.post("/api/actions/upgrade-equipment", summary="Purchase an equipment upgrade (Purchases API)")
+@app.post("/api/actions/upgrade-equipment")
 def upgrade_equipment(req: UpgradeEquipmentRequest):
     result = game_engine.upgrade_equipment(
         req.checking_id, req.equipment_merchant_id, req.amount
@@ -188,17 +113,8 @@ def upgrade_equipment(req: UpgradeEquipmentRequest):
     return result
 
 
-# ---------------------------------------------------------------------------
-# Narrative Event Choices
-# ---------------------------------------------------------------------------
-
-@app.post("/api/events/oven_repair", response_model=EventResult,
-          summary="Issue 1: Oven breakdown — player chooses credit or bear-with-it")
+@app.post("/api/events/oven_repair", response_model=EventResult)
 def event_oven_repair(req: EventRequest):
-    """
-    choice_index 0 → charge $1,500 repair to credit card (loan up).
-    choice_index 1 → bear with reduced capacity ($300 lost revenue).
-    """
     result = game_engine.handle_oven_repair(
         req.checking_id, req.loan_id, req.choice_index
     )
@@ -211,13 +127,8 @@ def event_oven_repair(req: EventRequest):
     )
 
 
-@app.post("/api/events/windfall", response_model=EventResult,
-          summary="Issue 2: Viral-video windfall — HYSA vs impulse purchase")
+@app.post("/api/events/windfall", response_model=EventResult)
 def event_windfall(req: EventRequest):
-    """
-    choice_index 0 → deposit $2,000 windfall to High-Yield Savings.
-    choice_index 1 → keep in checking, spend $500 on rose-gold whisk.
-    """
     result = game_engine.handle_windfall(
         req.checking_id, req.savings_id, req.choice_index
     )
@@ -230,13 +141,8 @@ def event_windfall(req: EventRequest):
     )
 
 
-@app.post("/api/events/permit_fine", response_model=EventResult,
-          summary="Issue 3: Health-inspector permit fine — pay now or appeal")
+@app.post("/api/events/permit_fine", response_model=EventResult)
 def event_permit_fine(req: EventRequest):
-    """
-    choice_index 0 → pay $200 fine immediately.
-    choice_index 1 → appeal: two weeks of closure costs $600 in lost revenue.
-    """
     result = game_engine.handle_permit_fine(
         req.checking_id, req.choice_index
     )
@@ -249,36 +155,33 @@ def event_permit_fine(req: EventRequest):
     )
 
 
-# ---------------------------------------------------------------------------
-
-@app.get("/api/accounts/{account_id}/deposits", summary="Deposit history for an account")
+@app.get("/api/accounts/{account_id}/deposits")
 def get_deposits(account_id: str):
     return nessie_client.get_account_deposits(account_id)
 
 
-@app.get("/api/accounts/{account_id}/withdrawals", summary="Withdrawal history for an account")
+@app.get("/api/accounts/{account_id}/withdrawals")
 def get_withdrawals(account_id: str):
     return nessie_client.get_account_withdrawals(account_id)
 
 
-@app.get("/api/accounts/{account_id}/transfers", summary="Transfer history for an account")
+@app.get("/api/accounts/{account_id}/transfers")
 def get_transfers(account_id: str):
     return nessie_client.get_account_transfers(account_id)
 
 
-@app.get("/api/accounts/{account_id}/purchases", summary="Purchase history for an account")
+@app.get("/api/accounts/{account_id}/purchases")
 def get_purchases(account_id: str):
     return nessie_client.get_account_purchases(account_id)
 
 
-@app.get("/api/ledger", summary="Full transaction ledger across all four game accounts")
+@app.get("/api/ledger")
 def full_ledger(
-    checking_id:   str = Query(..., description="Checking account ID"),
-    savings_id:    str = Query(..., description="Savings account ID"),
-    investment_id: str = Query(..., description="Investment account ID"),
-    loan_id:       str = Query(..., description="Loan / Credit account ID"),
+    checking_id:   str = Query(...),
+    savings_id:    str = Query(...),
+    investment_id: str = Query(...),
+    loan_id:       str = Query(...),
 ):
-    """Returns deposits, withdrawals, transfers, purchases, and bills for each account."""
     accounts = AccountIds(
         checking_id=checking_id,
         savings_id=savings_id,
@@ -288,32 +191,17 @@ def full_ledger(
     return game_engine.get_full_ledger(accounts)
 
 
-# ---------------------------------------------------------------------------
-# Eclair Gemini Reflection
-# ---------------------------------------------------------------------------
-
-@app.post("/api/eclair/reflect", response_model=EclairReflectResponse,
-          summary="Generate an in-character Eclair reflection on the player's finance-screen actions")
+@app.post("/api/eclair/reflect", response_model=EclairReflectResponse)
 async def eclair_reflect(req: EclairReflectRequest):
-    """
-    Builds a prompt from the list of finance actions the player took this week,
-    sends it to Gemini 1.5 Flash (async), and returns Eclair's 2-3 sentence
-    in-character response. Falls back to a canned line on any API error.
-    """
-    if req.actions_summary:
-        actions_text = "\n".join(f"• {a}" for a in req.actions_summary)
-    else:
-        actions_text = "• I didn't make any changes this week."
-
     prompt = (
         f"I'm Eclair, a panda who owns a bakery. This week (Week {req.week}) my advisor took these actions: {', '.join(req.actions_summary)}. "
         f"The current balances are: checking ${req.checking:,.0f}, savings ${req.savings:,.0f}, loan ${req.loan:,.0f}. "
         "Give me 1-2 sentences of actual, practical financial advice on whether these were good moves or what I should focus on next. "
-        "Be blunt and mean brutal do not be nice."
+        "Be blunt and brutal, do not be nice."
     )
     try:
         response = await _GENAI_CLIENT.aio.models.generate_content(
-            model="models/gemini-2.5-flash-lite",
+            model="models/gemma-3-27b-it",
             contents=prompt,
             config=genai_types.GenerateContentConfig(
                 system_instruction=_ECLAIR_SYSTEM,
@@ -321,13 +209,9 @@ async def eclair_reflect(req: EclairReflectRequest):
                 temperature=0.7,
             ),
         )
-        candidate = response.candidates[0]
-        finish_reason = candidate.finish_reason
-        full_text = response.text.strip()
-        print(f"[Eclair] OK (finish={finish_reason}): '{full_text[:60]}...'")
-        return EclairReflectResponse(reflection=full_text)
+        return EclairReflectResponse(reflection=response.text.strip())
     except Exception as e:
-        print(f"[Eclair] Gemini API error: {e}")
+        print(f"[Eclair] error: {e}")
         return EclairReflectResponse(
             reflection=(
                 "Oof, my brain got a bit over-proofed there! "
@@ -337,18 +221,10 @@ async def eclair_reflect(req: EclairReflectRequest):
         )
 
 
-# ---------------------------------------------------------------------------
-# Investments — live market data via yfinance
-# ---------------------------------------------------------------------------
-
 _TOP_TICKERS = ["SPY", "AAPL", "MSFT", "NVDA", "AMZN"]
 
-@app.get("/api/investments/top", summary="Top 5 tickers with live price + daily % change")
+@app.get("/api/investments/top")
 def top_investments():
-    """
-    Returns current price and daily % change for the five tracked tickers.
-    Uses yfinance fast_info for low-latency lookups.
-    """
     results = []
     for symbol in _TOP_TICKERS:
         try:
@@ -371,11 +247,7 @@ def top_investments():
     return {"tickers": results}
 
 
-# ---------------------------------------------------------------------------
-# Weekly Report
-# ---------------------------------------------------------------------------
-
-@app.get("/api/report", summary="Formatted end-of-week financial report")
+@app.get("/api/report")
 def weekly_report(
     checking_id:   str   = Query(...),
     savings_id:    str   = Query(...),
@@ -384,10 +256,6 @@ def weekly_report(
     week:          int   = Query(0),
     revenue:       float = Query(0.0),
 ):
-    """
-    Returns a plain-text financial summary mirroring Bakery.report() from
-    the 'my bakery' design — useful for debugging or a text-based UI.
-    """
     accounts = AccountIds(
         checking_id=checking_id,
         savings_id=savings_id,

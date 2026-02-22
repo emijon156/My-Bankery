@@ -1,20 +1,3 @@
-"""
-nessie_client.py
-Full Capital One Nessie API client covering every endpoint used by Bankery.
-
-Endpoints wrapped:
-  - Customers     (create, get, update)
-  - Accounts      (create, get, list, update, delete)
-  - Merchants     (create, get, list)
-  - Deposits      (create, list)
-  - Withdrawals   (create, list)
-  - Transfers     (create, list)
-  - Purchases     (create, list)
-  - Bills         (create, list)
-  - ATMs          (list)
-  - Branches      (list)
-"""
-
 from __future__ import annotations
 
 import os
@@ -28,10 +11,6 @@ load_dotenv()
 API_KEY: str = os.getenv("NESSIE_API_KEY", "")
 BASE_URL: str = "http://api.nessieisreal.com"
 
-
-# ---------------------------------------------------------------------------
-# Private HTTP helpers
-# ---------------------------------------------------------------------------
 
 def _url(path: str) -> str:
     return f"{BASE_URL}{path}?key={API_KEY}"
@@ -60,10 +39,6 @@ def _delete(path: str) -> dict[str, Any]:
     resp.raise_for_status()
     return resp.json()
 
-
-# ---------------------------------------------------------------------------
-# Customers
-# ---------------------------------------------------------------------------
 
 def create_customer(first_name: str, last_name: str = "Baker") -> dict:
     payload = {
@@ -99,10 +74,6 @@ def update_customer(customer_id: str, first_name: str, last_name: str) -> dict:
     }
     return _put(f"/customers/{customer_id}", payload)
 
-
-# ---------------------------------------------------------------------------
-# Accounts
-# ---------------------------------------------------------------------------
 
 def create_account(
     customer_id: str,
@@ -141,10 +112,6 @@ def delete_account(account_id: str) -> dict:
     return _delete(f"/accounts/{account_id}")
 
 
-# ---------------------------------------------------------------------------
-# Merchants  (required for Purchases)
-# ---------------------------------------------------------------------------
-
 def create_merchant(name: str, category: str) -> dict:
     payload = {
         "name": name,
@@ -170,10 +137,6 @@ def get_all_merchants() -> list[dict]:
     return _get("/merchants")
 
 
-# ---------------------------------------------------------------------------
-# Deposits
-# ---------------------------------------------------------------------------
-
 def create_deposit(
     account_id: str,
     amount: float,
@@ -194,10 +157,6 @@ def get_account_deposits(account_id: str) -> list[dict]:
     return _get(f"/accounts/{account_id}/deposits")
 
 
-# ---------------------------------------------------------------------------
-# Withdrawals
-# ---------------------------------------------------------------------------
-
 def create_withdrawal(
     account_id: str,
     amount: float,
@@ -217,10 +176,6 @@ def create_withdrawal(
 def get_account_withdrawals(account_id: str) -> list[dict]:
     return _get(f"/accounts/{account_id}/withdrawals")
 
-
-# ---------------------------------------------------------------------------
-# Transfers  (move money between two accounts)
-# ---------------------------------------------------------------------------
 
 def create_transfer(
     from_account_id: str,
@@ -243,10 +198,6 @@ def create_transfer(
 def get_account_transfers(account_id: str) -> list[dict]:
     return _get(f"/accounts/{account_id}/transfers")
 
-
-# ---------------------------------------------------------------------------
-# Purchases  (spending at a merchant)
-# ---------------------------------------------------------------------------
 
 def create_purchase(
     account_id: str,
@@ -271,10 +222,6 @@ def get_account_purchases(account_id: str) -> list[dict]:
     return _get(f"/accounts/{account_id}/purchases")
 
 
-# ---------------------------------------------------------------------------
-# Bills  (recurring charges; tracked on the checking account)
-# ---------------------------------------------------------------------------
-
 def create_bill(
     account_id: str,
     amount: float,
@@ -296,10 +243,6 @@ def create_bill(
 def get_account_bills(account_id: str) -> list[dict]:
     return _get(f"/accounts/{account_id}/bills")
 
-
-# ---------------------------------------------------------------------------
-# ATMs & Branches  (informational)
-# ---------------------------------------------------------------------------
 
 def get_atms() -> list[dict]:
     return _get("/atms")

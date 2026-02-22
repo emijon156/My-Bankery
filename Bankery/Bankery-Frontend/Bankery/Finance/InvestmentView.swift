@@ -21,7 +21,7 @@ struct InvestmentView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
 
-                        // ── Navigation bar ──────────────────────────────────
+
                         HStack {
                             Button { dismiss() } label: {
                                 HStack(spacing: 6) {
@@ -44,7 +44,7 @@ struct InvestmentView: View {
                             .opacity(0)
                         }
 
-                        // ── Eclair tip ──────────────────────────────────────
+
                         HStack(spacing: 12) {
                             Image("stand_speak_armsout")
                                 .resizable()
@@ -60,7 +60,6 @@ struct InvestmentView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(14)
 
-                        // ── Ticker Cards ────────────────────────────────────
                         if vm.investmentsLoading {
                             ProgressView("Loading market data…")
                                 .font(.custom("Cute-Dino", size: 16))
@@ -91,7 +90,6 @@ struct InvestmentView: View {
                             }
                         }
 
-                        // ── Fidelity CTA ────────────────────────────────────
                         VStack(spacing: 8) {
                             Text("Ready to invest for real?")
                                 .font(.custom("Cute-Dino", size: 18))

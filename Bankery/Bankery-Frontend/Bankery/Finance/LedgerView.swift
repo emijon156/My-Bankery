@@ -55,8 +55,7 @@ struct LedgerView: View {
 
                 VStack(spacing: 0) {
 
-                    // ── Back + title + tabs ──
-                    VStack(spacing: 16) {
+                        VStack(spacing: 16) {
                         HStack {
                             Button { dismiss() } label: {
                                 HStack(spacing: 6) {
@@ -83,7 +82,6 @@ struct LedgerView: View {
                     .padding(.horizontal, 142)
                     .padding(.top, 120)
 
-                    // ── Transaction List ──
                     if isLoading {
                         Spacer()
                         ProgressView()
@@ -128,7 +126,6 @@ struct LedgerView: View {
                     }
                 }
 
-                // ── Dialogue Panel (bottom 1/4) ──
                 VStack {
                     Spacer()
                     ZStack(alignment: .topLeading) {

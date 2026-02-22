@@ -1,10 +1,3 @@
-//
-//  FinanceViewModel.swift
-//  Bankery
-//
-//  Created by Emily Jon on 2/21/26.
-//
-
 import Foundation
 import Observation
 
@@ -12,7 +5,7 @@ import Observation
 @Observable
 class FinanceViewModel {
 
-    // MARK: - Balances (populated entirely from the backend — no hardcoded values)
+    // MARK: - Balances
     var checkingBalance: Double   = 0
     var savingsBalance: Double    = 0
     var investmentBalance: Double = 0
@@ -32,13 +25,11 @@ class FinanceViewModel {
     var investmentsLoading: Bool   = false
     var investmentsError: String?  = nil
 
-    /// Finance-screen actions logged this week; cleared when Next Week fires.
     var sessionActions: [String] = []
 
-    /// Set to true by any "Play Again" button; HomeView watches this to pop to root.
     var shouldResetToHome: Bool = false
 
-    // MARK: - Private Session IDs (persisted across turns, sent with every request)
+    // MARK: - IDs
     private var accountIDs: AccountIDs?
     private var merchantIDs: MerchantIDs?
 
@@ -67,9 +58,6 @@ class FinanceViewModel {
     ]}
 
     // MARK: - Networking
-    // Cloudflare Tunnel — public HTTPS URL that bypasses eduroam restrictions.
-    // Restart cloudflared if this URL expires:
-    //   cloudflared tunnel --url http://localhost:8000
     private let baseURL = "https://intelligence-supplied-arrangements-reflect.trycloudflare.com"
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -108,13 +96,11 @@ class FinanceViewModel {
             accountIDs  = result.accounts
             merchantIDs = result.merchants
 
-            // Set starting balances from what the backend created in Nessie
             checkingBalance   = result.startingBalances.checking
             savingsBalance    = result.startingBalances.savings
             investmentBalance = result.startingBalances.investment
             loanBalance       = result.startingBalances.loan
 
-            // Tangible assets use the backend's AssetsState defaults
             inventoryValue  = 1_000
             equipmentValue  = 5_000
 
@@ -172,7 +158,7 @@ class FinanceViewModel {
             equipmentValue    = result.equipment
             currentWeek       = result.week
             alerts            = result.alerts
-            sessionActions    = []   // clear for the new week
+            sessionActions    = []
 
             switch result.gameOutcome {
             case "won":  outcome = .won
@@ -234,8 +220,7 @@ class FinanceViewModel {
     }
 
     // MARK: - Helper Methods
-    
-    /// Clear action errors when user starts typing or changes input
+
     func clearActionError() {
         actionError = nil
     }
@@ -402,9 +387,6 @@ class FinanceViewModel {
 
     // MARK: - Eclair Gemini Reflection
 
-    /// Sends this week's finance-screen actions + live balances to Gemini Flash via the backend.
-    /// Returns Eclair's in-character reflection, or a fallback if the call fails.
-    /// Never throws — always returns a displayable string.
     func askEclair(actions: [String]) async -> String {
         guard let url = URL(string: "\(baseURL)/api/eclair/reflect") else {
             return eclairFallback()
@@ -437,7 +419,6 @@ class FinanceViewModel {
 
     // MARK: - Investments
 
-    /// Fetches live price + daily change for the top 5 tickers from /api/investments/top.
     func fetchTopInvestments() async {
         investmentsLoading = true
         investmentsError   = nil
@@ -457,8 +438,6 @@ class FinanceViewModel {
 
     // MARK: - Events (narrative choice outcomes)
 
-    /// Called by DialogueView when the player selects a choice option.
-    /// Hits POST /api/events/{key} and updates balances in place.
     func applyEvent(key: String, choice: Int) async {
         guard let ids = accountIDs else { return }
         guard let url = URL(string: "\(baseURL)/api/events/\(key)") else { return }
@@ -482,7 +461,6 @@ class FinanceViewModel {
             let alertType = result.alertType ?? "info"
             alerts.append(GameAlert(type: alertType, message: result.message))
         } catch {
-            // Non-critical — event effects are cosmetic during dialogue; don't crash the game.
             print("[Event] \(key) error: \(error)")
         }
     }

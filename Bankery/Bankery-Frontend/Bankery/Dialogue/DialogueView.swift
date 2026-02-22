@@ -21,10 +21,8 @@ struct DialogueView: View {
     @State private var typingTask: Task<Void, Never>? = nil
 
     // Choice state
-    /// Non-nil when a choice has been selected and its response is being shown.
     @State private var pendingChoiceResponse: String? = nil
 
-    /// True when Eclair has finished her question and buttons should be visible.
     private var showChoiceButtons: Bool {
         guard let choices = viewModel.currentLine.choices else { return false }
         return !choices.isEmpty && !isTyping && pendingChoiceResponse == nil
@@ -37,7 +35,6 @@ struct DialogueView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // MARK: - Scene Layers
                 Image("Wall_background")
                     .resizable()
                     .frame(width: geo.size.width, height: geo.size.height)

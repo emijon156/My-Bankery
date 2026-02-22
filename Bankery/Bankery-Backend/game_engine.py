@@ -1,21 +1,3 @@
-"""
-game_engine.py
-Bakery game logic — implements the Bakery turn-loop from "my bankery",
-backed entirely by the Nessie API.
-
-Architecture mirrors "my bankery":
-  Assets  (Cash: checking / savings / investment,  inventory,  equipment)
-  Liabilities  (loan,  acc_payable)
-  Expense  (rent,  wage,  utility)
-  Bakery methods:
-    add_revenue, add_expense, pay_expense,
-    add_loan, pay_loan, apply_interest,
-    transfer_cash, report
-
-All monetary state lives in Nessie — balances are always fetched fresh
-from the API rather than stored locally.
-"""
-
 from __future__ import annotations
 
 import random
@@ -25,12 +7,10 @@ from typing import Dict
 import nessie_client
 from models import AccountIds, MerchantIds, Alert, ExpenseState
 
-# ---------------------------------------------------------------------------
 # In-memory balance cache
 # Nessie balances are stale immediately after posting a transaction, so we
 # track the authoritative running balance ourselves and only fall back to
 # Nessie on a cold-start (first access for an account_id).
-# ---------------------------------------------------------------------------
 _balance_cache: Dict[str, float] = {}
 
 def _get_balance(account_id: str) -> float:
@@ -48,9 +28,6 @@ def seed_balances(balances: Dict[str, float]) -> None:
     for account_id, bal in balances.items():
         _balance_cache[account_id] = float(bal)
 
-# ---------------------------------------------------------------------------
-# Financial constants
-# ---------------------------------------------------------------------------
 
 # Weekly revenue range (random bakery sales, from "my bakery" randint 1500–3600)
 MIN_REVENUE: int = 1_500
@@ -64,10 +41,6 @@ SAVINGS_WEEKLY_RATE: float = 0.04 / 52      # ~4 % annual   (Safety Vault)
 INVESTMENT_WEEKLY_RATE: float = 0.07 / 52   # ~7 % annual   (Investment Fund)
 LOAN_WEEKLY_RATE: float = 0.10 / 52         # ~10 % annual  (The Drain)
 
-
-# ---------------------------------------------------------------------------
-# Game initialization
-# ---------------------------------------------------------------------------
 
 def setup_game() -> dict:
     """
@@ -140,10 +113,6 @@ def setup_game() -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Core weekly turn — mirrors Bakery's per-week methods
-# ---------------------------------------------------------------------------
-
 # Equipment depreciates 0.5 % per week (wear and tear)
 EQUIPMENT_WEEKLY_DEPRECIATION: float = 0.005
 
@@ -211,10 +180,6 @@ def process_week(
         "alerts":          alerts,
     }
 
-
-# ---------------------------------------------------------------------------
-# Player-triggered actions  (all backed by Nessie)
-# ---------------------------------------------------------------------------
 
 def add_loan(checking_id: str, loan_id: str, amount: float) -> dict:
     """
@@ -339,10 +304,6 @@ def upgrade_equipment(checking_id: str, equipment_merchant_id: str, amount: floa
         "message":  f"Purchased equipment upgrade for ${amount:,.2f}.",
     }
 
-
-# ---------------------------------------------------------------------------
-# Narrative event handlers  (called when player makes a story choice)
-# ---------------------------------------------------------------------------
 
 OVEN_REPAIR_COST:    float = 1_500.0
 OVEN_CAPACITY_LOSS:  float = 300.0    # weekly revenue shortfall from using fewer ovens
@@ -470,8 +431,6 @@ def handle_permit_fine(checking_id: str, choice_index: int) -> dict:
         }
 
 
-# ---------------------------------------------------------------------------
-
 def get_full_ledger(accounts: AccountIds) -> dict:
     """
     Returns all Nessie transaction records for every account.
@@ -523,10 +482,6 @@ def weekly_report(accounts: AccountIds, week: int, revenue: float) -> str:
         f"\nNet Worth:    ${net_worth:>10,.2f}\n"
     )
 
-
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
 
 def _add_revenue(checking_id: str, week: int, today: str) -> float:
     revenue = float(random.randint(MIN_REVENUE, MAX_REVENUE))

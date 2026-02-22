@@ -1,8 +1,3 @@
-//
-//  FinanceView.swift
-//  Bankery
-//
-
 import SwiftUI
 
 struct FinanceView: View {
@@ -21,7 +16,6 @@ struct FinanceView: View {
     // Action sheets
     @State private var showTransfer:     Bool = false
     @State private var showLoan:         Bool = false
-    //@State private var showShop:         Bool = false
     @State private var showLedger:       Bool = false
     @State private var showInvestments:  Bool = false
 
@@ -53,7 +47,6 @@ struct FinanceView: View {
                     outcomeScreen(title: "You Won! 🎉",
                                   subtitle: "You paid off the loan. Bankery is saved!", won: true)
                 } else {
-                    // ── Main content ──
                     HStack(alignment: .top, spacing: 0) {
                         ScrollView(.vertical, showsIndicators: false) {
                             VStack(spacing: 20) {
@@ -183,7 +176,6 @@ struct FinanceView: View {
                             HStack(spacing: 10) {
                                 actionButton("Transfer")   { showTransfer = true }
                                 actionButton("Loan") { showLoan     = true }
-                                //actionButton("Shop",     icon: "cart.fill",              color: .green)  { showShop     = true }
                                 actionButton("History") { showLedger   = true }
                             }
                             .padding(.horizontal)
@@ -284,7 +276,7 @@ struct FinanceView: View {
                             scrollOffset = -val
                         }
                     }
-                    } // end HStack
+                    }
                     .coordinateSpace(name: "scrollArea")
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.top, 100)
@@ -302,7 +294,6 @@ struct FinanceView: View {
                         .padding(.trailing, 80)
                     }
 
-                    // ── Dialogue Panel (bottom 1/4) ──
                     VStack {
                         Spacer()
 
@@ -381,7 +372,6 @@ struct FinanceView: View {
         }
         .navigationDestination(isPresented: $showTransfer) { TransferView().environment(financeViewModel) }
         .navigationDestination(isPresented: $showLoan)     { LoanView().environment(financeViewModel) }
-        //.navigationDestination(isPresented: $showShop)     { ShopView().environment(financeViewModel) }
         .navigationDestination(isPresented: $showLedger)   { LedgerView().environment(financeViewModel) }
         .navigationDestination(isPresented: $showInvestments) { InvestmentView().environment(financeViewModel) }
         .sheet(isPresented: $showEclairSheet) {
