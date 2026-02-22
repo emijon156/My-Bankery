@@ -2,10 +2,12 @@ class Expense:
     rent: float
     wage: float
     utility: float
-    total: float
 
     def __init__(self):
-        self.rent = 1
-        self.wage = 1
-        self.utility = 1
-        self.total = self.rent + self.wage + self.utility
+        self.rent = 500
+        self.wage = 500
+        self.utility = 50
+
+    @property
+    def total(self) -> float:
+        return self.rent + self.wage + self.utility
